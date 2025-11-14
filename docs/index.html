@@ -1,97 +1,785 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>DreadSec</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <title>DreadSec | Main</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="dreadsec: vulnerability research and write-ups.">
   <style>
     :root {
-      --bg-main:#02030a;--bg-elevated:rgba(8,10,20,0.98);--accent:#ff1446;--accent-soft:rgba(255,20,70,0.16);
-      --accent-alt:#3bbcff;--text-main:#f5f5f7;--text-muted:#8b8fa3;--border-subtle:rgba(255,255,255,0.06);
-      --radius-xl:22px;--shadow-soft:0 18px 40px rgba(0,0,0,0.55);--transition-fast:.18s ease-out;--transition-med:.26s ease-out;
+      --bg-main:#02030a;
+      --bg-panel:#050713;
+      --bg-card:#070918;
+      --accent:#ff1446;
+      --accent-soft:rgba(255,20,70,0.14);
+      --accent-alt:#35b7ff;
+      --text-main:#f5f5f7;
+      --text-muted:#8d91a5;
+      --border-soft:rgba(255,255,255,0.06);
+      --radius-xl:22px;
+      --radius-md:14px;
       --font-sans:system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+      --shadow-soft:0 22px 60px rgba(0,0,0,0.9);
+      --transition-fast:.18s ease-out;
+      --transition-med:.26s ease-out;
     }
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:var(--font-sans);background:var(--bg-main);color:var(--text-main);min-height:100vh;overflow-x:hidden}
-    a{color:inherit;text-decoration:none}
-    .bg-layer-grid{position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02)1px,transparent 1px),
-    linear-gradient(90deg,rgba(255,255,255,0.02)1px,transparent 1px);background-size:80px 80px;opacity:.2;
-    animation:gridDrift 40s linear infinite;z-index:-4;pointer-events:none}
-    @keyframes gridDrift{0%{transform:translate3d(0,0,0)}50%{transform:translate3d(-20px,-10px,0)scale(1.02)}100%{transform:translate3d(0,0,0)}}
-    .bg-layer-gradient{position:fixed;inset:-40px;background:radial-gradient(circle at top left,rgba(255,20,70,.11),transparent),
-    radial-gradient(circle at top right,rgba(59,188,255,.08),transparent),
-    radial-gradient(circle at bottom,rgba(255,20,70,.08),transparent);mix-blend-mode:screen;animation:bgPulse 14s ease-in-out infinite alternate;
-    z-index:-3;pointer-events:none}
-    @keyframes bgPulse{0%{opacity:.6;transform:translateY(0)}100%{opacity:1;transform:translateY(-10px)}}
-    .page-wrap{max-width:1220px;margin:0 auto;padding:26px 18px 40px}
-    header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:26px}
-    .brand-title{font-size:1.9rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
-    .brand-title span{color:var(--accent)}
-    .brand-subtitle{font-size:.78rem;text-transform:uppercase;color:var(--text-muted);letter-spacing:.18em}
-    nav{display:flex;gap:16px;font-size:.82rem;color:var(--text-muted)}
-    nav a{padding:6px 10px;border-radius:999px;transition:all var(--transition-fast)}
-    nav a:hover{color:var(--accent);background:rgba(10,10,18,.98)}
-    .main-layout{display:grid;grid-template-columns:minmax(0,280px)minmax(0,1fr);gap:22px}
-    .profile-card{background:var(--bg-elevated);border-radius:var(--radius-xl);padding:18px 16px;border:1px solid var(--border-subtle);
-    box-shadow:var(--shadow-soft);backdrop-filter:blur(26px);display:flex;flex-direction:column;gap:10px}
-    .profile-pic-wrap{width:64px;height:64px;border-radius:50%;overflow:hidden;box-shadow:0 0 16px rgba(255,20,70,.22)}
-    .profile-pic-wrap img{width:100%;height:100%;object-fit:cover}
-    .profile-name{font-size:1rem;font-weight:600}
-    .profile-bio{font-size:.78rem;color:var(--text-muted);line-height:1.6}
-    .writeups{background:rgba(3,4,10,.96);border-radius:var(--radius-xl);border:1px solid var(--border-subtle);
-    box-shadow:var(--shadow-soft);padding:16px}
-    .writeups-title{font-size:1.2rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
-    .posts-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:10px}
-    .post-card{background:rgba(4,6,14,.98);border-radius:18px;border:1px solid rgba(255,255,255,.05);
-    padding:7px;transition:all var(--transition-med);cursor:pointer}
-    .post-card:hover{transform:translateY(-3px);border-color:rgba(255,20,70,.4)}
-    .post-thumb-wrap{height:145px;border-radius:14px;overflow:hidden;margin-bottom:6px}
-    .post-thumb{width:100%;height:100%;object-fit:cover;opacity:.95;transition:transform var(--transition-med)}
-    .post-card:hover .post-thumb{transform:scale(1.04)}
-    .post-title{font-size:.9rem;font-weight:600;color:var(--text-main);line-height:1.4}
-    .post-excerpt{font-size:.68rem;color:var(--text-muted);line-height:1.5}
-    @media(min-width:720px){.posts-grid{grid-template-columns:repeat(2,1fr)}}
+    * {
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+    }
+    body {
+      font-family:var(--font-sans);
+      background:var(--bg-main);
+      color:var(--text-main);
+      min-height:100vh;
+      overflow-x:hidden;
+    }
+    a {
+      color:inherit;
+      text-decoration:none;
+    }
+
+    .bg-orbit {
+      position:fixed;
+      inset:-40px;
+      background:
+        radial-gradient(circle at top left,rgba(255,20,70,0.14),transparent),
+        radial-gradient(circle at top right,rgba(53,183,255,0.09),transparent),
+        radial-gradient(circle at bottom,rgba(255,20,70,0.08),transparent);
+      mix-blend-mode:screen;
+      pointer-events:none;
+      z-index:-3;
+      animation:bgShift 16s ease-in-out infinite alternate;
+    }
+    @keyframes bgShift {
+      0% {opacity:.6;transform:translate3d(0,0,0);}
+      50% {opacity:1;transform:translate3d(-10px,-6px,0) scale(1.02);}
+      100% {opacity:.85;transform:translate3d(6px,-4px,0);}
+    }
+
+    .bg-grid {
+      position:fixed;
+      inset:0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size:90px 90px;
+      opacity:.16;
+      pointer-events:none;
+      z-index:-4;
+      animation:gridDrift 38s linear infinite;
+    }
+    @keyframes gridDrift {
+      0% {transform:translate3d(0,0,0);}
+      50% {transform:translate3d(-24px,-18px,0) scale(1.03);}
+      100% {transform:translate3d(0,0,0);}
+    }
+
+    .page-wrap {
+      max-width:1240px;
+      margin:0 auto;
+      padding:20px 16px 40px;
+      position:relative;
+      z-index:1;
+    }
+
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:14px 16px;
+      border-radius:var(--radius-xl);
+      background:radial-gradient(circle at top left,rgba(255,20,70,0.12),transparent);
+      border:1px solid var(--border-soft);
+      backdrop-filter:blur(26px);
+      box-shadow:var(--shadow-soft);
+      margin-bottom:18px;
+    }
+    .brand {
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .brand-title {
+      font-size:1.8rem;
+      font-weight:700;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+    .brand-title span {
+      color:var(--accent);
+    }
+    .brand-sub {
+      font-size:.74rem;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--text-muted);
+    }
+    .nav {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:.78rem;
+      color:var(--text-muted);
+      flex-wrap:wrap;
+    }
+    .nav a {
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid transparent;
+      transition:all var(--transition-fast);
+    }
+    .nav a:hover {
+      color:var(--accent);
+      border-color:var(--accent-soft);
+      background:rgba(0,0,0,0.86);
+    }
+    .nav-pill {
+      border-color:var(--accent-soft);
+      color:var(--accent);
+    }
+
+    .layout {
+      display:grid;
+      grid-template-columns:minmax(0,290px) minmax(0,1fr);
+      gap:18px;
+      margin-top:6px;
+      align-items:flex-start;
+    }
+
+    .panel-profile {
+      background:var(--bg-panel);
+      border-radius:var(--radius-xl);
+      padding:16px 14px 12px;
+      border:1px solid var(--border-soft);
+      box-shadow:var(--shadow-soft);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      backdrop-filter:blur(24px);
+    }
+    .profile-top {
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .avatar-ring {
+      width:72px;
+      height:72px;
+      border-radius:50%;
+      padding:2px;
+      background:conic-gradient(from 220deg, var(--accent), transparent, var(--accent-alt), transparent, var(--accent));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .avatar-inner {
+      width:100%;
+      height:100%;
+      border-radius:50%;
+      overflow:hidden;
+      background:#000;
+    }
+    .avatar-inner img {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+    .profile-id {
+      font-size:.9rem;
+      font-weight:600;
+    }
+    .profile-tagline {
+      font-size:.72rem;
+      color:var(--accent-alt);
+    }
+    .profile-bio {
+      font-size:.74rem;
+      color:var(--text-muted);
+      line-height:1.6;
+    }
+    .profile-flags {
+      display:flex;
+      flex-wrap:wrap;
+      gap:4px;
+      margin-top:2px;
+    }
+    .profile-flag {
+      font-size:.6rem;
+      padding:3px 7px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.06);
+      background:rgba(255,255,255,0.01);
+      color:var(--text-muted);
+    }
+    .profile-metrics {
+      display:flex;
+      justify-content:space-between;
+      font-size:.62rem;
+      color:var(--text-muted);
+      margin-top:6px;
+      gap:6px;
+    }
+    .profile-metrics span strong {
+      color:var(--accent);
+      font-weight:500;
+    }
+
+    .panel-feed {
+      background:var(--bg-panel);
+      border-radius:var(--radius-xl);
+      padding:14px 14px 12px;
+      border:1px solid var(--border-soft);
+      box-shadow:var(--shadow-soft);
+      backdrop-filter:blur(24px);
+      position:relative;
+      overflow:hidden;
+    }
+    .panel-feed::before {
+      content:"";
+      position:absolute;
+      inset:-40%;
+      background:radial-gradient(circle at top,rgba(255,20,70,0.08),transparent);
+      opacity:0;
+      transition:opacity var(--transition-med);
+      pointer-events:none;
+    }
+    .panel-feed:hover::before {
+      opacity:1;
+    }
+
+    .feed-header {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:10px;
+      margin-bottom:10px;
+      position:relative;
+      z-index:1;
+    }
+    .feed-label {
+      font-size:.66rem;
+      text-transform:uppercase;
+      letter-spacing:.14em;
+      color:var(--accent-alt);
+    }
+    .feed-title {
+      font-size:1.1rem;
+      font-weight:600;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+    }
+    .feed-sub {
+      font-size:.7rem;
+      color:var(--text-muted);
+      margin-top:2px;
+    }
+
+    .feed-controls {
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      align-items:center;
+      justify-content:flex-end;
+      font-size:.64rem;
+      color:var(--text-muted);
+    }
+    .control {
+      display:flex;
+      align-items:center;
+      gap:4px;
+      padding:4px 7px;
+      border-radius:999px;
+      background:rgba(5,6,14,0.98);
+      border:1px solid var(--border-soft);
+    }
+    .control span {
+      text-transform:uppercase;
+      letter-spacing:.11em;
+      font-size:.55rem;
+      color:var(--text-muted);
+    }
+    .control input,
+    .control select {
+      background:transparent;
+      border:none;
+      outline:none;
+      color:var(--text-main);
+      font-size:.68rem;
+      min-width:64px;
+    }
+    .control input::placeholder {
+      color:var(--text-muted);
+    }
+    .control select option {
+      background:#02030a;
+      color:var(--text-main);
+    }
+    .count-pill {
+      padding:4px 8px;
+      border-radius:999px;
+      background:var(--accent-soft);
+      color:var(--accent);
+      font-size:.62rem;
+    }
+
+    .posts-grid {
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+      margin-top:8px;
+      position:relative;
+      z-index:1;
+    }
+    @media (min-width:780px) {
+      .posts-grid {
+        grid-template-columns:repeat(2,minmax(0,1fr));
+      }
+    }
+
+    .post {
+      display:flex;
+      flex-direction:column;
+      gap:5px;
+      padding:7px;
+      border-radius:var(--radius-md);
+      background:var(--bg-card);
+      border:1px solid rgba(255,255,255,0.04);
+      transition:all var(--transition-med);
+      cursor:pointer;
+      position:relative;
+      overflow:hidden;
+    }
+    .post:hover {
+      transform:translateY(-3px);
+      box-shadow:0 16px 40px rgba(0,0,0,0.9);
+      border-color:var(--accent-soft);
+    }
+    .post-thumb-wrap {
+      width:100%;
+      height:140px;
+      border-radius:10px;
+      overflow:hidden;
+      position:relative;
+      background:radial-gradient(circle at center,rgba(255,20,70,0.12),#02030a);
+    }
+    .post-thumb {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      opacity:.96;
+      transition:transform var(--transition-med),opacity var(--transition-med);
+    }
+    .post:hover .post-thumb {
+      transform:scale(1.04);
+      opacity:1;
+    }
+    .post-tag-row {
+      position:absolute;
+      bottom:6px;
+      left:6px;
+      display:flex;
+      gap:4px;
+      flex-wrap:wrap;
+    }
+    .post-tag {
+      font-size:.52rem;
+      padding:3px 6px;
+      border-radius:999px;
+      backdrop-filter:blur(12px);
+      background:rgba(0,0,0,0.82);
+      border:1px solid rgba(255,255,255,0.14);
+      color:var(--accent);
+    }
+    .post-meta {
+      font-size:.58rem;
+      color:var(--text-muted);
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .post-meta span {
+      display:inline-flex;
+      gap:4px;
+      align-items:center;
+    }
+    .dot {
+      width:4px;
+      height:4px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.34);
+    }
+    .post-title {
+      font-size:.9rem;
+      font-weight:600;
+      color:var(--text-main);
+      line-height:1.4;
+    }
+    .post-excerpt {
+      font-size:.68rem;
+      color:var(--text-muted);
+      line-height:1.6;
+    }
+    .post-link {
+      font-size:.62rem;
+      color:var(--accent-alt);
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      margin-top:2px;
+      opacity:.9;
+      transition:all var(--transition-fast);
+    }
+    .post:hover .post-link {
+      color:var(--accent);
+      gap:6px;
+      opacity:1;
+    }
+    .no-results {
+      margin-top:14px;
+      font-size:.72rem;
+      color:var(--text-muted);
+      display:none;
+    }
+
+    .modal-backdrop {
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.9);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      z-index:50;
+    }
+    .modal {
+      max-width:760px;
+      width:100%;
+      background:#02030d;
+      border-radius:18px;
+      padding:18px 16px 14px;
+      border:1px solid rgba(255,255,255,0.24);
+      box-shadow:0 26px 60px rgba(0,0,0,1);
+      position:relative;
+      max-height:82vh;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .modal-close {
+      position:absolute;
+      right:10px;
+      top:8px;
+      font-size:1.1rem;
+      cursor:pointer;
+      color:var(--text-muted);
+      transition:color var(--transition-fast),transform var(--transition-fast);
+    }
+    .modal-close:hover {
+      color:var(--accent);
+      transform:scale(1.1);
+    }
+    .modal-title {
+      font-size:1rem;
+      font-weight:600;
+      padding-right:22px;
+    }
+    .modal-meta {
+      font-size:.6rem;
+      color:var(--text-muted);
+    }
+    .modal-body {
+      font-size:.7rem;
+      color:var(--text-main);
+      line-height:1.7;
+      overflow-y:auto;
+      margin-top:2px;
+      padding-right:2px;
+    }
+
+    @media (max-width:860px) {
+      header {
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      .layout {
+        grid-template-columns:1fr;
+      }
+      .panel-profile {
+        order:1;
+      }
+      .panel-feed {
+        order:2;
+      }
+    }
+    @media (max-width:520px) {
+      .brand-title {
+        font-size:1.45rem;
+      }
+      .feed-title {
+        font-size:.98rem;
+      }
+      .posts-grid {
+        grid-template-columns:1fr;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="bg-layer-grid"></div>
-  <div class="bg-layer-gradient"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-orbit"></div>
+
   <div class="page-wrap">
     <header>
-      <div>
-        <div class="brand-title">dread<span>sec</span></div>
-        <div class="brand-subtitle">vulnerability research • write-ups • analysis</div>
+      <div class="brand">
+        <div class="brand-title">dread<span>sec</span>☠︎︎</div>
+        <div class="brand-sub">vulnerability & security research • whiskey & debuggers</div>
       </div>
-      <nav>
-        <a href="#writeups">Write-ups</a>
-        <a href="#about">About</a>
+      <nav class="nav">
+        <a href="#writeups">write-ups</a>
+        <a href="#about">about</a>
+        <a href="#writeups" class="nav-pill">latest</a>
       </nav>
     </header>
-    <main class="main-layout">
-      <aside class="profile-card" id="about">
-        <div class="profile-pic-wrap">
-          <img src="images/pfp.jpeg" alt="profile" />
-        </div>
-        <div class="profile-name">d7ead</div>
-        <p class="profile-bio">
-          Offensive Security Professional.
-          <br><br>
-          I write about cool topics and pwning all the things.
-        </p>
-      </aside>
-      <section class="writeups" id="writeups">
-        <div class="writeups-title">Write-ups</div>
-        <div class="posts-grid">
-          <article class="post-card">
-            <div class="post-thumb-wrap">
-              <img src="<placeholder>" alt="thumbnail missing :'(" class="post-thumb">
+
+    <div class="layout">
+      <aside class="panel-profile" id="about">
+        <div class="profile-top">
+          <div class="avatar-ring">
+            <div class="avatar-inner">
+              <img src="images/pfp.jpeg" alt="dread avatar">
             </div>
-            <div class="post-title">Coming soon...</div>
-            <div class="post-excerpt">Coming soon...</div>
-          </article>
+          </div>
+          <div>
+            <div class="profile-id">dread</div>
+            <div class="profile-tagline">Security Researcher</div>
+          </div>
+        </div>
+        <p class="profile-bio">
+          Focused on offensive security, security research, responsible vulnerability disclosure, and anything cool or confusing.
+        </p>
+        <div class="profile-flags">
+          <div class="profile-flag">Red Team Operations</div>
+          <div class="profile-flag">Vulnerability Research</div>
+          <div class="profile-flag">Malware & APTs</div>
+          <div class="profile-flag">Exploit Development</div>
+          <div class="profile-flag">Popping Kernels</div>
+          <div class="profile-flag">Capture The Flag</div>
+          <div class="profile-flag">CVEs</div>
+        </div>
+        <div class="profile-metrics">
+          <span>entries: <strong id="profileTotalPosts"></strong></span>
+          <span>updated: <strong id="profileUpdated"></strong></span>
+        </div>
+      </aside>
+
+      <section class="panel-feed" id="writeups">
+        <div class="feed-header">
+          <div>
+            <div class="feed-label">security chronicles</div>
+            <div class="feed-title">write-ups & research</div>
+            <div class="feed-sub">Consume my security dogma.</div>
+          </div>
+          <div class="feed-controls">
+            <div class="control">
+              <span>search</span>
+              <input id="searchInput" type="text" placeholder="c2, edr, ad, ctf">
+            </div>
+            <div class="control">
+              <span>scope</span>
+              <select id="filterSelect">
+                <option value="all">All</option>
+                <option value="Red Team">Vulnerability Research</option>
+                <option value="Exploit Development">Exploit Development</option>
+                <option value="Malware">Malware</option>
+                <option value="CTFs">CTFs</option>
+              </select>
+            </div>
+            <div class="control">
+              <span>order</span>
+              <select id="sortSelect">
+                <option value="desc">newest</option>
+                <option value="asc">oldest</option>
+              </select>
+            </div>
+            <div class="count-pill" id="countPill">0 posts</div>
+          </div>
+        </div>
+        <div class="posts-grid" id="postsGrid"></div>
+        <div class="no-results" id="noResults">
+          no matching entries. adjust the scope or use a simpler term.
         </div>
       </section>
-    </main>
+    </div>
   </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-close" id="modalClose" aria-label="Close modal">&times;</div>
+      <div class="modal-title" id="modalTitle"></div>
+      <div class="modal-meta" id="modalMeta"></div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const BASE_URL = "https://dreadsec.co";
+
+    const postsData = [
+      {
+        title:"CVE-2025-63602: Hijacking System Calls with a Popular Crypto Miner",
+        date:"2025-11-12",
+        category:"Exploit Development",
+        readTime:"15 min",
+        difficulty:"Advanced",
+        image:"images/awesomeminer.jpeg",
+        slug:"#",
+        excerpt:"An insecure utility kernel driver component in Awesome Miner 11.2.4 (Intel) allows unprivileged users to totally compromise systems via arbitrary MSR read/write. This also affects previous versions.",
+        tags:["Privilege Escalation","Kernel","CVE / Zero-Day"]
+      },
+      {
+        title:"CVE-2025-61156: Murdering EDR/AV with a Trusted, Insecure Driver",
+        date:"2025-11-07",
+        category:"Exploit Development",
+        readTime:"15 min",
+        difficulty:"Advanced",
+        image:"images/edrmurder.jpeg",
+        slug:"#",
+        excerpt:"A trusted kernel driver component in ThreatFire System Monitor allows arbitrary termination of protected processes (PPL) with kernel privileges, allowing the murder of EDR and AV solutions as an unprivileged user. (Coming soon, see repo)",
+        tags:["Red Team Operations","EDR / AV","CVE / Zero-Day"]
+      }
+    ];
+
+    const postsGrid = document.getElementById("postsGrid");
+    const searchInput = document.getElementById("searchInput");
+    const filterSelect = document.getElementById("filterSelect");
+    const sortSelect = document.getElementById("sortSelect");
+    const noResults = document.getElementById("noResults");
+    const countPill = document.getElementById("countPill");
+    const profileTotal = document.getElementById("profileTotalPosts");
+    const profileUpdated = document.getElementById("profileUpdated");
+
+    function escapeHTML(str) {
+      return String(str)
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#039;");
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr + "T00:00:00");
+      if (Number.isNaN(d.getTime())) return escapeHTML(dateStr);
+      return d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"});
+    }
+
+    function makeSlug(title) {
+      return String(title)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g,"-")
+        .replace(/^-+|-+$/g,"");
+    }
+
+    function goToPost(title) {
+      const slug = makeSlug(title);
+      const url = BASE_URL + "/p/" + encodeURIComponent(slug) + ".html";
+      window.location.href = url;
+    }
+
+    function getFilteredSortedPosts() {
+      const q = (searchInput.value || "").toLowerCase().trim();
+      const scope = filterSelect.value;
+      const order = sortSelect.value;
+      let list = postsData.filter(post => {
+        if (scope !== "all" && post.category !== scope) return false;
+        if (!q) return true;
+        const haystack = (
+          post.title + " " +
+          post.category + " " +
+          post.excerpt + " " +
+          (post.tags || []).join(" ")
+        ).toLowerCase();
+        return haystack.includes(q);
+      });
+      list.sort((a,b) => {
+        const da = new Date(a.date);
+        const db = new Date(b.date);
+        return order === "asc" ? da - db : db - da;
+      });
+      return list;
+    }
+
+    function renderPosts() {
+      const posts = getFilteredSortedPosts();
+      postsGrid.innerHTML = "";
+      if (!posts.length) {
+        noResults.style.display = "block";
+        countPill.textContent = "0 posts";
+        return;
+      }
+      noResults.style.display = "none";
+      countPill.textContent = posts.length + (posts.length === 1 ? " post" : " posts");
+      posts.forEach((post, idx) => {
+        const card = document.createElement("article");
+        card.className = "post";
+        card.dataset.index = idx.toString();
+        card.tabIndex = 0;
+        card.setAttribute("role","link");
+        const imgSrc = post.image || "images/default.jpg";
+        const tagsHtml = (post.tags || [])
+          .slice(0,3)
+          .map(t => '<span class="post-tag">'+escapeHTML(t)+'</span>')
+          .join("");
+        const slugPath = BASE_URL + "/p/" + encodeURIComponent(makeSlug(post.title)) + ".html";
+        card.innerHTML =
+          '<div class="post-thumb-wrap">' +
+            '<img class="post-thumb" loading="lazy" src="'+escapeHTML(imgSrc)+'" alt="'+escapeHTML(post.title)+'">' +
+            '<div class="post-tag-row">' +
+              '<span class="post-tag">'+escapeHTML(post.category)+'</span>' +
+              tagsHtml +
+            '</div>' +
+          '</div>' +
+          '<div class="post-meta">' +
+            '<span>'+formatDate(post.date)+'</span>' +
+            '<span><span class="dot"></span>'+escapeHTML(post.readTime)+'</span>' +
+            '<span><span class="dot"></span>'+escapeHTML(post.difficulty)+'</span>' +
+          '</div>' +
+          '<div class="post-title">'+escapeHTML(post.title)+'</div>' +
+          '<div class="post-excerpt">'+escapeHTML(post.excerpt)+'</div>' +
+          '<a class="post-link" href="'+slugPath+'">view entry<span>&#10140;</span></a>';
+
+        card.addEventListener("click", () => goToPost(post.title));
+        card.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            goToPost(post.title);
+          }
+        });
+
+        postsGrid.appendChild(card);
+      });
+    }
+
+    searchInput.addEventListener("input", renderPosts);
+    filterSelect.addEventListener("change", renderPosts);
+    sortSelect.addEventListener("change", renderPosts);
+
+    profileTotal.textContent = postsData.length.toString();
+    const latestDate = postsData
+      .map(p => new Date(p.date))
+      .filter(d => !Number.isNaN(d.getTime()))
+      .sort((a,b) => b-a)[0];
+    profileUpdated.textContent = latestDate
+      ? latestDate.getFullYear().toString()
+      : new Date().getFullYear().toString();
+
+    renderPosts();
+  </script>
 </body>
 </html>
